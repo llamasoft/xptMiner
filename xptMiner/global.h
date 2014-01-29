@@ -29,6 +29,9 @@ typedef unsigned __int64 uint64_t;
 #define RtlZeroMemory(Destination,Length) std::memset((Destination),0,(Length))
 #define RtlCopyMemory(Destination,Source,Length) std::memcpy((Destination),(Source),(Length))
 
+#ifdef __CYGWIN__
+#include <cstdlib>
+#endif
 #define _strdup(duration) strdup(duration)
 #define Sleep(ms) usleep(1000*ms)
 #define strcpy_s(dest,val,src) strncopy(dest,src,val)

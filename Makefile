@@ -2,12 +2,17 @@ CXX = g++
 CC = cc
 CXXFLAGS = -Wall -Wextra -std=c++0x -O2 -fomit-frame-pointer 
 
+OSVERSION := $(shell uname -s)
+
+ifeq ($(OSVERSION),CYGWIN_NT-6.1)
+	CXXFLAGS = -Wall -Wextra -std=gnu++0x -O2 -fomit-frame-pointer 
+endif
+
 CFLAGS = -Wall -Wextra -O2 -fomit-frame-pointer 
 # add these for more speed! (if your cpu can do them)
 #-msse2 -msse3 -mssse3 -msse4a -msse2avx -msse4a -msse4.1 -msse4.2 -mavx 
 
 
-OSVERSION := $(shell uname -s)
 #LIBS = -lcrypto -lssl -lpthread
 LIBS =
 
@@ -40,6 +45,14 @@ else
        EXTENSION =
 
 endif
+
+ifeq ($(OSVERSION),CYGWIN_NT-6.1)
+	EXTENSION = .exe
+	LIBS += -lOpenCL
+        LIBPATHS += -L/cygdrive/c/Program\ Files\ \(x86\)/AMD\ APP\ SDK/2.9/lib/x86_64/
+	INCLUDEPATHS += -I/cygdrive/c/Program\ Files\ \(x86\)/AMD\ APP\ SDK/2.9/include
+endif
+
 
 JHLIB = xptMiner/jhlib.o \
 
