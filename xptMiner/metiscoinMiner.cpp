@@ -1,6 +1,15 @@
 #include"global.h"
+#include "OpenCLObjects.h"
 
-#define GROUPED_HASHES  (32)
+void metiscoin_init_opencl(int device_num) {
+	printf("Initializing GPU %d\n", device_num);
+	OpenCLMain &main = OpenCLMain::getInstance();
+	std::vector<std::string> files;
+	files.push_back("opencl/metis.cl");
+	OpenCLProgram* program = main.getDevice(0)->getContext()->loadProgramFromFiles(files);
+	OpenCLKernel* kernel = program->getKernel("metis512");
+	main.listDevices();
+}
 
 void metiscoin_process(minerMetiscoinBlock_t* block)
 {
@@ -11,47 +20,63 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 	block->nonce = 0;
 
 	uint32 target = *(uint32*)(block->targetShare+28);
-	uint64 hash0[8*GROUPED_HASHES];
+	uint64 hash0[8];
+	uint64 hash1[8];
 	uint64 hash2[8];
-	// since only the nonce changes we can calculate the first keccak round in advance
-	unsigned long long keccakPre[25];
-	sph_keccak512_init(&ctx_keccak);
-	keccak_core_prepare(&ctx_keccak, block, keccakPre);
+	uint64 hash2_2[8];
+
+	OpenCLKernel* kernel = OpenCLMain::getInstance().getDevice(0)->getContext()->getProgram(0)->getKernel("metis512");
+	OpenCLBuffer* in = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(64, CL_MEM_WRITE_ONLY, NULL);
+	OpenCLBuffer* out = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(64, CL_MEM_WRITE_ONLY, NULL);
+	OpenCLCommandQueue * q = OpenCLMain::getInstance().getDevice(0)->getContext()->createCommandQueue(OpenCLMain::getInstance().getDevice(0));
+
+	kernel->resetArgs();
+	kernel->addGlobalArg(in);
+	kernel->addGlobalArg(out);
+
 	for(uint32 n=0; n<0x1000; n++)
 	{
 		if( block->height != monitorCurrentBlockHeight )
 			break;
-		for(uint32 f=0; f<0x8000; f += GROUPED_HASHES)
+		for(uint32 f=0; f<0x8000; f++)
 		{
+			sph_keccak512_init(&ctx_keccak);
+			sph_keccak512(&ctx_keccak, &block->version, 80);
+			sph_keccak512_close(&ctx_keccak, hash0);
 
-		// todo: Generate multiple hashes for multiple nonces at once
-		block->nonce = n*0x10000+f;
-		for(uint32 i=0; i<GROUPED_HASHES; i++)
-		{
-		  keccak_core_opt(&ctx_keccak, keccakPre, *(unsigned long long*)(&block->nBits), hash0+i*8);
-		  block->nonce++;
+			sph_shavite512_init(&ctx_shavite);
+			sph_shavite512(&ctx_shavite, hash0, 64);
+			sph_shavite512_close(&ctx_shavite, hash1);
+
+			sph_metis512_init(&ctx_metis);
+			sph_metis512(&ctx_metis, hash1, 64);
+			sph_metis512_close(&ctx_metis, hash2);
+
+			q->enqueueReadBuffer(in, hash1, 64);
+			q->enqueueKernel1D(kernel, 1, 1);
+			q->enqueueWriteBuffer(out, hash2_2, 64);
+
+			q->finish();
+
+			for (int i = 0; i < 64; i++) {
+				if (hash2[i] != hash2_2[i]) {
+					printf ("hashes are different\n");
+				}
+			}
+
+			if( *(uint32*)((uint8*)hash2+28) <= target )
+			{
+				totalShareCount++;
+				xptMiner_submitShare(block);
+			}
+			block->nonce++;
 		}
-		for(uint32 i=0; i<GROUPED_HASHES; i++)
-		{
-		  sph_shavite512_init(&ctx_shavite);
-		  sph_shavite512(&ctx_shavite, hash0+i*8, 64);
-		  sph_shavite512_close(&ctx_shavite, hash0+i*8);
-		}
-		block->nonce = n*0x10000+f;
-		for(uint32 i=0; i<GROUPED_HASHES; i++)
-		{
-		  sph_metis512_init(&ctx_metis);
-		  sph_metis512(&ctx_metis, hash0+i*8, 64);
-		  sph_metis512_close(&ctx_metis, hash2);
-		  if( *(uint32*)((uint8*)hash2+28) <= target )
-		  {
-			totalShareCount++;
-			//block->nonce = rawBlock.nonce;
-			xptMiner_submitShare(block);
-		  }
-		  block->nonce++;
-		}
-		}
-		totalCollisionCount += 1; // count in steps of 0x8000
+		totalCollisionCount += 0x8000;
 	}
+
+	delete q;
+	delete out;
+	delete in;
+	delete kernel;
+
 }

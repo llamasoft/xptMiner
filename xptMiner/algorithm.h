@@ -10,3 +10,4 @@ void scrypt_process_cpu(minerScryptBlock_t* block);
 void primecoin_process(minerPrimecoinBlock_t* block);
 // metiscoin
 void metiscoin_process(minerMetiscoinBlock_t* block);
+void metiscoin_init_opencl(int device_num);

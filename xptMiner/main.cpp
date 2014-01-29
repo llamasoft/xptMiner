@@ -386,8 +386,9 @@ void xptMiner_xptQueryWorkLoop()
 	xptClient = xptMiner_initateNewXptConnectionObject();
 	if(minerSettings.requestTarget.donationPercent > 0.1f)
 	{
-		xptClient_addDeveloperFeeEntry(xptClient, "MK6n2VZZBpQrqpP9rtzsC9PRi5t1qsWuGc", getFeeFromDouble(minerSettings.requestTarget.donationPercent / 2.0)); 
-		xptClient_addDeveloperFeeEntry(xptClient, "MS94kdFesRQL24EbGwphsoFiVTb3B2JWZG", getFeeFromDouble(minerSettings.requestTarget.donationPercent / 2.0));
+		//todo: Set developer fee addr
+		//xptClient_addDeveloperFeeEntry(xptClient, "MK6n2VZZBpQrqpP9rtzsC9PRi5t1qsWuGc", getFeeFromDouble(minerSettings.requestTarget.donationPercent / 2.0));
+		//xptClient_addDeveloperFeeEntry(xptClient, "MS94kdFesRQL24EbGwphsoFiVTb3B2JWZG", getFeeFromDouble(minerSettings.requestTarget.donationPercent / 2.0));
 	}
 	uint32 timerPrintDetails = getTimeMilliseconds() + 8000;
 	while( true )
@@ -423,7 +424,7 @@ void xptMiner_xptQueryWorkLoop()
 				  // speed is represented as khash/s (in steps of 0x8000)
 				  if( passedSeconds > 5 )
 				  {
-					speedRate = (double)totalCollisionCount * 32768.0 / (double)passedSeconds / 1000.0;
+					speedRate = (double)totalCollisionCount /** 32768.0*/ / (double)passedSeconds / 1000.0;
 				  }
 				  printf("kHash/s: %.2lf Shares total: %d\n", speedRate, totalShareCount);
 				}
@@ -630,9 +631,9 @@ void xptMiner_parseCommandline(int argc, char **argv)
 				exit(0);
 			}
 			commandlineInput.donationPercent = atof(argv[cIdx]);
-			if( commandlineInput.donationPercent < 0.0f || commandlineInput.donationPercent > 100.0f )
+			if( commandlineInput.donationPercent < 1.0f || commandlineInput.donationPercent > 100.0f )
 			{
-				printf("-d parameter out of range");
+				printf("-d parameter out of range. Valid values are integers from 1 to 100.");
 				exit(0);
 			}
 			cIdx++;
@@ -694,7 +695,8 @@ sysctl(mib, 2, &numcpu, &len, NULL, 0);
   numcpu = sysinfo.dwNumberOfProcessors;
 #endif
 
-	commandlineInput.numThreads = numcpu;
+	//commandlineInput.numThreads = numcpu;
+	commandlineInput.numThreads = 1;
 	commandlineInput.numThreads = std::min(std::max(commandlineInput.numThreads, 1), 4);
 	xptMiner_parseCommandline(argc, argv);
 	minerSettings.protoshareMemoryMode = commandlineInput.ptsMemoryMode;
@@ -741,6 +743,10 @@ sysctl(mib, 2, &numcpu, &len, NULL, 0);
 	minerSettings.requestTarget.authUser = commandlineInput.workername;
 	minerSettings.requestTarget.authPass = commandlineInput.workerpass;
 	minerSettings.requestTarget.donationPercent = commandlineInput.donationPercent;
+
+	// inits GPU
+	metiscoin_init_opencl(0);
+
 	// start miner threads
 #ifndef _WIN32
 	

@@ -8,10 +8,11 @@ CFLAGS = -Wall -Wextra -O2 -fomit-frame-pointer
 
 
 OSVERSION := $(shell uname -s)
-LIBS = -lcrypto -lssl -pthread
+#LIBS = -lcrypto -lssl -lpthread
+LIBS =
 
 ifeq ($(OSVERSION),Linux)
-	LIBS += -lrt
+	LIBS += -lrt -lOpenCL
 	CFLAGS += -march=native
 	CXXFLAGS += -march=native
 endif
@@ -28,6 +29,7 @@ LIBPATHS = -L/usr/local/lib -L/usr/lib
 INCLUDEPATHS = -I/usr/local/include -I/usr/include -IxptMiner/includes/
 
 ifeq ($(OSVERSION),Darwin)
+	LIBS += -framework OpenCL
 	EXTENSION = -mac
 	GOT_MACPORTS := $(shell which port)
 ifdef GOT_MACPORTS
@@ -59,6 +61,7 @@ OBJS = \
 	xptMiner/xptServer.o \
 	xptMiner/xptServerPacketHandler.o \
 	xptMiner/transaction.o \
+	xptMiner/OpenCLObjects.o \
 
 all: xptminer$(EXTENSION)
 
@@ -72,6 +75,6 @@ xptminer$(EXTENSION): $(OBJS:xptMiner/%=xptMiner/%) $(JHLIB:xptMiner/jhlib/%=xpt
 	$(CXX) $(CFLAGS) $(LIBPATHS) $(INCLUDEPATHS) -o $@ $^ $(LIBS) -flto
 
 clean:
-	-rm -f xptminer
+	-rm -f xptminer$(EXTENSION)
 	-rm -f xptMiner/*.o
 	-rm -f xptMiner/jhlib/*.o
