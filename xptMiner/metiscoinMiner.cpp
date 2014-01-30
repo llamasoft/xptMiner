@@ -10,10 +10,10 @@ void metiscoin_init_opencl(int device_num) {
 	OpenCLProgram* program_metis = main.getDevice(0)->getContext()->loadProgramFromFiles(files_metis);
 	OpenCLKernel* kernel_metis = program_metis->getKernel("metis512");
 
-	std::vector<std::string> files_shavite;
-	files_shavite.push_back("opencl/shavite.cl");
-	OpenCLProgram* program_shavite = main.getDevice(0)->getContext()->loadProgramFromFiles(files_shavite);
-	OpenCLKernel* kernel_shavite = program_shavite->getKernel("shavite512");
+//	std::vector<std::string> files_shavite;
+//	files_shavite.push_back("opencl/shavite.cl");
+//	OpenCLProgram* program_shavite = main.getDevice(0)->getContext()->loadProgramFromFiles(files_shavite);
+//	OpenCLKernel* kernel_shavite = program_shavite->getKernel("shavite512");
 
 	main.listDevices();
 }
@@ -59,16 +59,16 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 			sph_metis512(&ctx_metis, hash1, 64);
 			sph_metis512_close(&ctx_metis, hash2);
 
-//			q->enqueueWriteBuffer(in, hash1, 64);
-//			q->enqueueKernel1D(kernel, 1, 1);
-//			q->enqueueReadBuffer(out, hash2_2, 64);
-//			q->finish();
-//
-//			for (int i = 0; i < 8; i++) {
-//				if (hash2[i] != hash2_2[i]) {
-//					printf ("hashes are different %d %lX %lX\n", i, hash2[i], hash2_2[i]);
-//				}
-//			}
+			q->enqueueWriteBuffer(in, hash1, 64);
+			q->enqueueKernel1D(kernel, 1, 1);
+			q->enqueueReadBuffer(out, hash2_2, 64);
+			q->finish();
+
+			for (int i = 0; i < 8; i++) {
+				if (hash2[i] != hash2_2[i]) {
+					printf ("hashes are different %d %lX %lX\n", i, hash2[i], hash2_2[i]);
+				}
+			}
 
 			if( *(uint32*)((uint8*)hash2+28) <= target )
 			{

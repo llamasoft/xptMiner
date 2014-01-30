@@ -604,12 +604,28 @@ enc32be(void *dst, uint val)
 	((unsigned char *)dst)[3] = val;
 }
 
-#define ROR(n, s)   do { \
-		uint tmp[n]; \
-		memcpy(tmp, S + ((s) - (n)), (n) * sizeof(uint)); \
-		memmove(S + (n), S, ((s) - (n)) * sizeof(uint)); \
-		memcpy(S, tmp, (n) * sizeof(uint)); \
-	} while (0)
+void *memcpy(void *v_dst, const void *v_src, size_t c)
+{
+	const char *src = v_src;
+	char *dst = v_dst;
+
+	/* Simple, byte oriented memcpy. */
+	while (c--)
+		*dst++ = *src++;
+
+	return v_dst;
+}
+
+void ror(uint* S, size_t n) {
+	uint tmp[36];
+	for (int i = 0; i < 36; i++) {
+		tmp[(i+n)%36] = S[i];
+	}
+	for (int i = 0; i < 36; i++) {
+		S[i] = tmp[i];
+	}
+}
+
 
 void
 metis_close(metis_context *sc, void *dst)
@@ -618,29 +634,35 @@ metis_close(metis_context *sc, void *dst)
 	unsigned ub = 0;
 	unsigned n = 0;
 
-	unsigned char buf[16]; \
-	unsigned plen, rms; \
-	unsigned char *out; \
-	uint S[36]; \
-	plen = sc->partial_len; \
-	enc64be(buf + 4, sc->bit_count + n); \
-	if (plen == 0 && n == 0) { \
-		plen = 4; \
-	} else if (plen < 4 || n != 0) { \
-		unsigned u; \
- \
-		if (plen == 4) \
-			plen = 0; \
-		buf[plen] = ub & ~(0xFFU >> n); \
-		for (u = plen + 1; u < 4; u ++) \
-			buf[u] = 0; \
-	} \
-	metis_core(sc, buf + plen, (sizeof buf) - plen); \
-	rms = sc->round_shift * (12); \
-	memcpy(S, sc->S + (36) - rms, rms * sizeof(uint)); \
-	memcpy(S + rms, sc->S, ((36) - rms) * sizeof(uint));
+	unsigned char buf[16];
+	unsigned plen, rms;
+	unsigned char *out;
+	uint S[36];
+	plen = sc->partial_len;
+	enc64be(buf + 4, sc->bit_count + n);
+	if (plen == 0 && n == 0) {
+		plen = 4;
+	} else if (plen < 4 || n != 0) {
+		unsigned u;
+
+		if (plen == 4)
+			plen = 0;
+		buf[plen] = ub & ~(0xFFU >> n);
+		for (u = plen + 1; u < 4; u ++)
+			buf[u] = 0;
+	}
+	metis_core(sc, buf + plen, (sizeof buf) - plen);
+	rms = sc->round_shift * (12);
+//	memcpy(S, sc->S + (36) - rms, rms * sizeof(uint));
+	for (i = 0; i < rms; i++) {
+		S[i] = (sc->S + (36) - rms)[i];
+	}
+//	memcpy(S + rms, sc->S, ((36) - rms) * sizeof(uint));
+	for (i = 0; i < ((36) - rms); i++) {
+		(S + rms)[i] = (sc->S)[i];
+	}
 	for (i = 0; i < 32; i ++) {
-		ROR(3, 36);
+		ror(S, 3);
 		CMIX36(S[0], S[1], S[2], S[4], S[5], S[6], S[18], S[19], S[20]);
 		SMIX(S[0], S[1], S[2], S[3]);
 	}
@@ -649,25 +671,25 @@ metis_close(metis_context *sc, void *dst)
 		S[9] ^= S[0];
 		S[18] ^= S[0];
 		S[27] ^= S[0];
-		ROR(9, 36);
+		ror(S, 9);
 		SMIX(S[0], S[1], S[2], S[3]);
 		S[4] ^= S[0];
 		S[10] ^= S[0];
 		S[18] ^= S[0];
 		S[27] ^= S[0];
-		ROR(9, 36);
+		ror(S, 9);
 		SMIX(S[0], S[1], S[2], S[3]);
 		S[4] ^= S[0];
 		S[10] ^= S[0];
 		S[19] ^= S[0];
 		S[27] ^= S[0];
-		ROR(9, 36);
+		ror(S, 9);
 		SMIX(S[0], S[1], S[2], S[3]);
 		S[4] ^= S[0];
 		S[10] ^= S[0];
 		S[19] ^= S[0];
 		S[28] ^= S[0];
-		ROR(8, 36);
+		ror(S, 8);
 		SMIX(S[0], S[1], S[2], S[3]);
 	}
 	S[4] ^= S[0];
