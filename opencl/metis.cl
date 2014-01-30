@@ -389,25 +389,25 @@ void metis_init(metis_context* sc) {
 	sc->bit_count = 0;
 }
 
-#define TIX4(q, x00, x01, x04, x07, x08, x22, x24, x27, x30)    { \
+#define TIX4(q, x00, x01, x04, x07, x08, x22, x24, x27, x30)   do { \
 		x22 ^= x00; \
 		x00 = (q); \
 		x08 ^= x00; \
 		x01 ^= x24; \
 		x04 ^= x27; \
 		x07 ^= x30; \
-	}
+	} while (0)
 
-#define CMIX36(x00, x01, x02, x04, x05, x06, x18, x19, x20)    { \
+#define CMIX36(x00, x01, x02, x04, x05, x06, x18, x19, x20)   do { \
 		x00 ^= x04; \
 		x01 ^= x05; \
 		x02 ^= x06; \
 		x18 ^= x04; \
 		x19 ^= x05; \
 		x20 ^= x06; \
-	}
+	} while (0)
 
-#define SMIX(x0, x1, x2, x3)    { \
+#define SMIX(x0, x1, x2, x3)   do { \
 		uint c0 = 0; \
 		uint c1 = 0; \
 		uint c2 = 0; \
@@ -478,25 +478,30 @@ void metis_init(metis_context* sc) {
 			| ((c1 ^ (r2 >> 8)) & (0x0000FF00)) \
 			| ((c2 ^ (r3 >> 8)) & (0x000000FF)); \
 		/* */ \
-	}
+	} while (0)
+
+uint my_dec32be(const void *src)
+{
+	return ((uint)(((const unsigned char *)src)[0]) << 24)
+		| ((uint)(((const unsigned char *)src)[1]) << 16)
+		| ((uint)(((const unsigned char *)src)[2]) << 8)
+		| (uint)(((const unsigned char *)src)[3]);
+}
 
 #define NEXT(rc) \
 	if (len <= 4) { \
 		rshift = (rc); \
 		break; \
 	} \
-	p = sph_dec32be(data); \
+	p = my_dec32be(data); \
 	data = (const unsigned char *)data + 4; \
 	len -= 4
 
-void metis4_core(metis_context *sc, const void *data, size_t len)
+void metis_core(metis_context *sc, const void *data, size_t len)
 {
-	uint* S = sc->S;
 	uint p;
 	unsigned plen, rshift;
-	do {
-		sc->bit_count += (ulong)len << 3;
-	} while (0);
+	sc->bit_count += (ulong)len << 3;
 	p = sc->partial;
 	plen = sc->partial_len;
 	if (plen < 4) {
@@ -517,9 +522,10 @@ void metis4_core(metis_context *sc, const void *data, size_t len)
 	}
 
 	rshift = sc->round_shift;
+	uint* S = sc->S;
 	//switch (rshift) {
 		for (;;) {
-			sph_u32 q;
+			uint q;
 
 		if(rshift <= 0) {
 			q = p;
@@ -563,7 +569,7 @@ void metis4_core(metis_context *sc, const void *data, size_t len)
 			NEXT(0);
 		}
 		}
-
+	//}
 	p = 0;
 	sc->partial_len = (unsigned)len;
 	while (len -- > 0) {
@@ -572,8 +578,121 @@ void metis4_core(metis_context *sc, const void *data, size_t len)
 	}
 	sc->partial = p;
 	sc->round_shift = rshift;
-
 }
+
+
+void
+enc64be(void *dst, ulong val)
+{
+	((unsigned char *)dst)[0] = (val >> 56);
+	((unsigned char *)dst)[1] = (val >> 48);
+	((unsigned char *)dst)[2] = (val >> 40);
+	((unsigned char *)dst)[3] = (val >> 32);
+	((unsigned char *)dst)[4] = (val >> 24);
+	((unsigned char *)dst)[5] = (val >> 16);
+	((unsigned char *)dst)[6] = (val >> 8);
+	((unsigned char *)dst)[7] = val;
+}
+
+
+void
+enc32be(void *dst, uint val)
+{
+	((unsigned char *)dst)[0] = (val >> 24);
+	((unsigned char *)dst)[1] = (val >> 16);
+	((unsigned char *)dst)[2] = (val >> 8);
+	((unsigned char *)dst)[3] = val;
+}
+
+#define ROR(n, s)   do { \
+		uint tmp[n]; \
+		memcpy(tmp, S + ((s) - (n)), (n) * sizeof(uint)); \
+		memmove(S + (n), S, ((s) - (n)) * sizeof(uint)); \
+		memcpy(S, tmp, (n) * sizeof(uint)); \
+	} while (0)
+
+void
+metis_close(metis_context *sc, void *dst)
+{
+	int i;
+	unsigned ub = 0;
+	unsigned n = 0;
+
+	unsigned char buf[16]; \
+	unsigned plen, rms; \
+	unsigned char *out; \
+	uint S[36]; \
+	plen = sc->partial_len; \
+	enc64be(buf + 4, sc->bit_count + n); \
+	if (plen == 0 && n == 0) { \
+		plen = 4; \
+	} else if (plen < 4 || n != 0) { \
+		unsigned u; \
+ \
+		if (plen == 4) \
+			plen = 0; \
+		buf[plen] = ub & ~(0xFFU >> n); \
+		for (u = plen + 1; u < 4; u ++) \
+			buf[u] = 0; \
+	} \
+	metis_core(sc, buf + plen, (sizeof buf) - plen); \
+	rms = sc->round_shift * (12); \
+	memcpy(S, sc->S + (36) - rms, rms * sizeof(uint)); \
+	memcpy(S + rms, sc->S, ((36) - rms) * sizeof(uint));
+	for (i = 0; i < 32; i ++) {
+		ROR(3, 36);
+		CMIX36(S[0], S[1], S[2], S[4], S[5], S[6], S[18], S[19], S[20]);
+		SMIX(S[0], S[1], S[2], S[3]);
+	}
+	for (i = 0; i < 13; i ++) {
+		S[4] ^= S[0];
+		S[9] ^= S[0];
+		S[18] ^= S[0];
+		S[27] ^= S[0];
+		ROR(9, 36);
+		SMIX(S[0], S[1], S[2], S[3]);
+		S[4] ^= S[0];
+		S[10] ^= S[0];
+		S[18] ^= S[0];
+		S[27] ^= S[0];
+		ROR(9, 36);
+		SMIX(S[0], S[1], S[2], S[3]);
+		S[4] ^= S[0];
+		S[10] ^= S[0];
+		S[19] ^= S[0];
+		S[27] ^= S[0];
+		ROR(9, 36);
+		SMIX(S[0], S[1], S[2], S[3]);
+		S[4] ^= S[0];
+		S[10] ^= S[0];
+		S[19] ^= S[0];
+		S[28] ^= S[0];
+		ROR(8, 36);
+		SMIX(S[0], S[1], S[2], S[3]);
+	}
+	S[4] ^= S[0];
+	S[9] ^= S[0];
+	S[18] ^= S[0];
+	S[27] ^= S[0];
+	out = (unsigned char *)dst;
+	enc32be(out +  0, S[ 1]);
+	enc32be(out +  4, S[ 2]);
+	enc32be(out +  8, S[ 3]);
+	enc32be(out + 12, S[ 4]);
+	enc32be(out + 16, S[ 9]);
+	enc32be(out + 20, S[10]);
+	enc32be(out + 24, S[11]);
+	enc32be(out + 28, S[12]);
+	enc32be(out + 32, S[18]);
+	enc32be(out + 36, S[19]);
+	enc32be(out + 40, S[20]);
+	enc32be(out + 44, S[21]);
+	enc32be(out + 48, S[27]);
+	enc32be(out + 52, S[28]);
+	enc32be(out + 56, S[29]);
+	enc32be(out + 60, S[30]);
+}
+
 
 kernel void metis_init_g(global metis_context* ctx_g) {
 	metis_context ctx;
@@ -584,26 +703,28 @@ kernel void metis_init_g(global metis_context* ctx_g) {
 }
 
 kernel void metis_update_g(global metis_context* ctx_g, global char* data_g) {
-//	metis_context ctx;
-//	metis_init(&ctx);
-//
-//	char data[64];
-//	for (int i = 0; i < 64; i++) {
-//		data[i] = data_g[i];
-//	}
-//
-//	void metis4_core(&ctx, data, 64);
-//
-//	(*ctx_g) = ctx;
+	metis_context ctx;
+	metis_init(&ctx);
+
+	char data[64];
+	for (int i = 0; i < 64; i++) {
+		data[i] = data_g[i];
+	}
+
+	metis_core(&ctx, data, 64);
+
+	(*ctx_g) = ctx;
 }
 
 kernel void metis512(global ulong * in, global ulong * out) {
 
+	ulong data[8];
+	ulong hash[8];
 	metis_context ctx;
 	metis_init(&ctx);
-
-	int id = get_global_id(0);
-	for (int i = 0; i < 8; i++) {
-		out[i] = in[i];
-	}
+	for (int i = 0; i < 8; i++) data[i] = in[i];
+	metis_core(&ctx, data, 64);
+	metis_close(&ctx, hash);
+	for (int i = 0; i < 8; i++) out[i] = hash[i];
 }
+
