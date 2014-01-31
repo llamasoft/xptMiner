@@ -11,7 +11,7 @@ typedef struct {
 
 #define C32(x)    ((uint)(x))
 
-__constant const uint IV512[] = {
+__constant const uint IV512shavite[] = {
 	C32(0x72FCCDD8), C32(0x79CA4727), C32(0x128A077B), C32(0x40D55AEC),
 	C32(0xD1901A06), C32(0x430AE307), C32(0xB29F5CD1), C32(0xDF07FBFC),
 	C32(0x8E45D73D), C32(0x681AB538), C32(0xBDE86578), C32(0xDD577E47),
@@ -23,7 +23,7 @@ shavite_init(shavite_context *sc)
 {
 	// cannot use memcpy on different addr space
 	//memcpy(sc->h, IV512, sizeof sc->h);
-	for (int i = 0; i < 16; i++) sc->h[i] = IV512[i];
+	for (int i = 0; i < 16; i++) sc->h[i] = IV512shavite[i];
 	sc->ptr = 0;
 	sc->count0 = 0;
 	sc->count1 = 0;
@@ -60,6 +60,25 @@ shavite_init(shavite_context *sc)
 
 #define AES_ROUND_NOKEY_LE(X0, X1, X2, X3, Y0, Y1, Y2, Y3) \
 	AES_ROUND_LE(X0, X1, X2, X3, 0, 0, 0, 0, Y0, Y1, Y2, Y3)
+
+#define AES_ROUND_NOKEY(x0, x1, x2, x3)   do { \
+		uint t0 = (x0); \
+		uint t1 = (x1); \
+		uint t2 = (x2); \
+		uint t3 = (x3); \
+		AES_ROUND_NOKEY_LE(t0, t1, t2, t3, x0, x1, x2, x3); \
+	} while (0)
+
+#define KEY_EXPAND_ELT(k0, k1, k2, k3)   do { \
+		uint kt; \
+		AES_ROUND_NOKEY(k1, k2, k3, k0); \
+		kt = (k0); \
+		(k0) = (k1); \
+		(k1) = (k2); \
+		(k2) = (k3); \
+		(k3) = kt; \
+	} while (0)
+
 
 /*
  * The AES*[] tables allow us to perform a fast evaluation of an AES
@@ -334,6 +353,16 @@ __constant uint AES3[256] = {
 	AESx(0x82C34141), AESx(0x29B09999), AESx(0x5A772D2D), AESx(0x1E110F0F),
 	AESx(0x7BCBB0B0), AESx(0xA8FC5454), AESx(0x6DD6BBBB), AESx(0x2C3A1616)
 };
+
+uint
+sph_dec32le_aligned(const void *src)
+{
+	return (uint)(((const unsigned char *)src)[0])
+		| ((uint)(((const unsigned char *)src)[1]) << 8)
+		| ((uint)(((const unsigned char *)src)[2]) << 16)
+		| ((uint)(((const unsigned char *)src)[3]) << 24);
+}
+
 /*
  * This function assumes that "msg" is aligned for 32-bit access.
  */
@@ -929,7 +958,10 @@ shavite_core(shavite_context *sc, const void *data, size_t len)
 		clen = (sizeof sc->buf) - ptr;
 		if (clen > len)
 			clen = len;
-		memcpy(buf + ptr, data, clen);
+		//memcpy(buf + ptr, data, clen);
+		for (int ii = 0; ii < clen; ii++) {
+			(buf + ptr)[ii] = ((unsigned char*)data)[ii];
+		}
 		data = (const unsigned char *)data + clen;
 		ptr += clen;
 		len -= clen;
@@ -982,16 +1014,28 @@ shavite_close(shavite_context *sc, void *dst)
 	z = ((ub & -z) | z) & 0xFF;
 	if (ptr == 0 && n == 0) {
 		buf[0] = 0x80;
-		memset(buf + 1, 0, 109);
+		//memset(buf + 1, 0, 109);
+		for (int ii = 0; ii < 109; ii++) {
+			(buf + 1)[ii] = 0;
+		}
 		sc->count0 = sc->count1 = sc->count2 = sc->count3 = 0;
 	} else if (ptr < 110) {
 		buf[ptr ++] = z;
-		memset(buf + ptr, 0, 110 - ptr);
+		//memset(buf + ptr, 0, 110 - ptr);
+		for (int ii = 0; ii < (110 - ptr); ii++) {
+			(buf + ptr)[ii] = 0;
+		}
 	} else {
 		buf[ptr ++] = z;
-		memset(buf + ptr, 0, 128 - ptr);
+		//memset(buf + ptr, 0, 128 - ptr);
+		for (int ii = 0; ii < (128 - ptr); ii++) {
+			(buf + ptr)[ii] = 0;
+		}
 		c512(sc, buf);
-		memset(buf, 0, 110);
+		//memset(buf, 0, 110);
+		for (int ii = 0; ii < 110; ii++) {
+			buf[ii] = 0;
+		}
 		sc->count0 = sc->count1 = sc->count2 = sc->count3 = 0;
 	}
 	enc32le(buf + 110, count0);

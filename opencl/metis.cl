@@ -2,7 +2,7 @@
 #   include "OpenCLKernel.hpp"
 #endif
 
-__constant const uint IV512[] = {
+__constant const uint IV512metis[] = {
 	(0x8807a57e), (0xe616af75), (0xc5d3e4db),
 	(0xac9ab027), (0xd915f117), (0xb6eecc54),
 	(0x06e8020b), (0x4a92efd1), (0xaac6e2c9),
@@ -381,7 +381,7 @@ void metis_init(metis_context* sc) {
 	for (u = 0; u < 20; u ++)
 		sc->S[u] = 0;
 	for (int i = 0; i < 16; i++) {
-		sc->S[20+i] = IV512[i];
+		sc->S[20+i] = IV512metis[i];
 	}
 	sc->partial = 0;
 	sc->partial_len = 0;
