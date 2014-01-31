@@ -6,7 +6,7 @@
 #   include "OpenCLKernel.hpp"
 #endif
 
-kernel void metiscoin_process(global char* in, global ulong* out, uint begin_nonce) {
+kernel void metiscoin_process(global char* in, global uint* out, global uint* outcount, uint begin_nonce, uint target) {
 
 	size_t id = get_global_id(0);
 	uint nonce = (uint)id + begin_nonce;
@@ -43,9 +43,10 @@ kernel void metiscoin_process(global char* in, global ulong* out, uint begin_non
 	metis_core(&ctx_metis, hash1, 64);
 	metis_close(&ctx_metis, hash2);
 
-	// copys out
-	for (int i = 0; i < 8; i++) {
-		out[i+(8*id)] = hash2[i];
+	if( *(uint*)((uchar*)hash2+28) <= target )
+	{
+		uint pos = atomic_inc(out) + 1; //saves first pos for counter
+		out[pos] = nonce;
 	}
 
 }

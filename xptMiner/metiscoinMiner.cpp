@@ -4,8 +4,9 @@
 OpenCLKernel* kernel;
 OpenCLBuffer* in;
 OpenCLBuffer* out;
+OpenCLBuffer* out_count;
 OpenCLCommandQueue * q;
-uint64_t *out_tmp = new uint64_t[0x8000*8];
+uint32_t *out_tmp = new uint32_t[255];
 
 void metiscoin_init_opencl(int device_num) {
 	printf("Initializing GPU %d\n", device_num);
@@ -32,7 +33,8 @@ void metiscoin_init_opencl(int device_num) {
 	main.listDevices();
 
 	in = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(80, CL_MEM_READ_WRITE, NULL);
-	out = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(64 * 0x8000, CL_MEM_READ_WRITE, NULL);
+	out = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(sizeof(cl_uint) * 255, CL_MEM_READ_WRITE, NULL);
+	out_count = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(sizeof(cl_uint), CL_MEM_READ_WRITE, NULL);
 	q = OpenCLMain::getInstance().getDevice(0)->getContext()->createCommandQueue(OpenCLMain::getInstance().getDevice(0));
 
 	uint64_t *out_tmp = new uint64_t[0x8000*8];
@@ -49,11 +51,6 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 	block->nonce = 0;
 
 	uint32 target = *(uint32*)(block->targetShare+28);
-//	uint64 hash0[8];
-//	uint64 hash1[8];
-//	uint64 hash2[8];
-//	uint64 hash2_2[8];
-
 
 	for(uint32 n=0; n<0x1000; n++)
 	{
@@ -63,37 +60,24 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 		kernel->resetArgs();
 		kernel->addGlobalArg(in);
 		kernel->addGlobalArg(out);
+		kernel->addGlobalArg(out_count);
 		kernel->addScalarUInt(n*0x8000);
+		kernel->addScalarUInt(target);
+
+		cl_uint out_count_tmp = 0;
 
 		q->enqueueWriteBuffer(in, &block->version, 80);
+		q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 		q->enqueueKernel1D(kernel, 0x8000, kernel->getWorkGroupSize(OpenCLMain::getInstance().getDevice(0)));
-		q->enqueueReadBuffer(out, out_tmp, 0x8000*64);
+		q->enqueueReadBuffer(out, out_tmp, sizeof(cl_uint) * 255);
+		q->enqueueReadBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 		q->finish();
 
-		for(uint32 f=0; f<0x8000; f++)
-		{
-//			sph_keccak512_init(&ctx_keccak);
-//			sph_keccak512(&ctx_keccak, &block->version, 80);
-//			sph_keccak512_close(&ctx_keccak, hash0);
-//
-//			sph_shavite512_init(&ctx_shavite);
-//			sph_shavite512(&ctx_shavite, hash0, 64);
-//			sph_shavite512_close(&ctx_shavite, hash1);
-//
-//			sph_metis512_init(&ctx_metis);
-//			sph_metis512(&ctx_metis, hash1, 64);
-//			sph_metis512_close(&ctx_metis, hash2);
-
-			uint64_t * hash2 = out_tmp + (f * 8);
-
-			if( *(uint32*)((uint8*)hash2+28) <= target )
-			{
-				totalShareCount++;
-				xptMiner_submitShare(block);
-			}
-
-			block->nonce++;
+		for (int i =0; i < out_count_tmp; i++) {
+			block->nonce = out_tmp[i];
+			xptMiner_submitShare(block);
 		}
+
 		totalCollisionCount += 0x8000;
 	}
 
