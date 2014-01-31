@@ -54,8 +54,8 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 
 //	for(uint32 n=0; n<0x1000; n++)
 //	{
-		if( block->height != monitorCurrentBlockHeight )
-			break;
+//		if( block->height != monitorCurrentBlockHeight )
+//			break;
 
 		kernel->resetArgs();
 		kernel->addGlobalArg(in);
