@@ -52,24 +52,23 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 
 	uint32 target = *(uint32*)(block->targetShare+28);
 
-//	for(uint32 n=0; n<0x1000; n++)
-//	{
-//		if( block->height != monitorCurrentBlockHeight )
-//			break;
+	for(uint32 n=0; n<0x100; n++)
+	{
+		if( block->height != monitorCurrentBlockHeight )
+			break;
 
 		kernel->resetArgs();
 		kernel->addGlobalArg(in);
 		kernel->addGlobalArg(out);
 		kernel->addGlobalArg(out_count);
-//		kernel->addScalarUInt(n*0x8000);
-		kernel->addScalarUInt(0);
+		kernel->addScalarUInt(n*0x80000);
 		kernel->addScalarUInt(target);
 
 		cl_uint out_count_tmp = 0;
 
 		q->enqueueWriteBuffer(in, &block->version, 80);
 		q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
-		q->enqueueKernel1D(kernel, 0x1000*0x8000, kernel->getWorkGroupSize(OpenCLMain::getInstance().getDevice(0)));
+		q->enqueueKernel1D(kernel, 0x80000, kernel->getWorkGroupSize(OpenCLMain::getInstance().getDevice(0)));
 		q->enqueueReadBuffer(out, out_tmp, sizeof(cl_uint) * 255);
 		q->enqueueReadBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 		q->finish();
@@ -79,7 +78,7 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 			xptMiner_submitShare(block);
 		}
 
-		totalCollisionCount += 0x1000*0x8000;
-	//}
+		totalCollisionCount += 0x80000;
+	}
 
 }
