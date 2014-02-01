@@ -1,5 +1,6 @@
 #include"global.h"
 #include "OpenCLObjects.h"
+#include "ticker.h"
 
 OpenCLKernel* kernel;
 OpenCLBuffer* in;
@@ -55,6 +56,7 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 	// measure time
 	for(uint32 n=0; n<0x1000; n++)
 	{
+		uint32 begin = getTimeMilliseconds();
 		if( block->height != monitorCurrentBlockHeight )
 			break;
 
@@ -67,15 +69,12 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 
 		cl_uint out_count_tmp = 0;
 
-		uint32 begin = getTimeMilliseconds();
 		q->enqueueWriteBuffer(in, &block->version, 80);
 		q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 		q->enqueueKernel1D(kernel, 0x8000, kernel->getWorkGroupSize(OpenCLMain::getInstance().getDevice(0)));
 		q->enqueueReadBuffer(out, out_tmp, sizeof(cl_uint) * 255);
 		q->enqueueReadBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 		q->finish();
-		uint32 end = getTimeMilliseconds();
-		printf("Elapsed time: %d ms\n", (end-begin));
 
 		for (int i =0; i < out_count_tmp; i++) {
 			block->nonce = out_tmp[i];
@@ -83,6 +82,8 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 		}
 
 		totalCollisionCount += 0x8000;
+		uint32 end = getTimeMilliseconds();
+		printf("Elapsed time: %d ms\n", (end-begin));
 	}
 
 }
