@@ -482,109 +482,192 @@ void metis_init(metis_context* sc) {
 		/* */ \
 	} while (0)
 
-uint my_dec32be(const void *src)
+#define my_dec32be(src) ((uint)((*((uchar4*)(src))).s3210))
+
+void metis_core(metis_context *sc, const void *vdata, size_t len)
 {
-	return ((uint)(((const unsigned char *)src)[0]) << 24)
-		| ((uint)(((const unsigned char *)src)[1]) << 16)
-		| ((uint)(((const unsigned char *)src)[2]) << 8)
-		| (uint)(((const unsigned char *)src)[3]);
-}
-
-#define NEXT(rc) \
-	if (len <= 4) { \
-		rshift = (rc); \
-		break; \
-	} \
-	p = my_dec32be(data); \
-	data = (const unsigned char *)data + 4; \
-	len -= 4
-
-void metis_core(metis_context *sc, const void *data, size_t len)
-{
-	uint p;
-	unsigned plen, rshift;
-	sc->bit_count += (ulong)len << 3;
-	p = sc->partial;
-	plen = sc->partial_len;
-	if (plen < 4) {
-		unsigned count = 4 - plen;
-		if (len < count)
-			count = len;
-		plen += count;
-#pragma unroll
-		while (count -- > 0) {
-			p = (p << 8) | *(const unsigned char *)data;
-			data = (const unsigned char *)data + 1;
-			len --;
-		}
-		if (len == 0) {
-			sc->partial = p;
-			sc->partial_len = plen;
-			return;
-		}
-	}
-
-	rshift = sc->round_shift;
+	const unsigned char * cdata = (const unsigned char *)vdata;
 	uint* S = sc->S;
-	//switch (rshift) {
-#pragma unroll
-		for (;;) {
-			uint q;
+	TIX4(my_dec32be(cdata), S[0], S[1], S[4], S[7], S[8], S[22], S[24], S[27], S[30]);
+	CMIX36(S[33], S[34], S[35], S[1], S[2], S[3], S[15], S[16], S[17]);
+	SMIX(S[33], S[34], S[35], S[0]);
+	CMIX36(S[30], S[31], S[32], S[34], S[35], S[0], S[12], S[13], S[14]);
+	SMIX(S[30], S[31], S[32], S[33]);
+	CMIX36(S[27], S[28], S[29], S[31], S[32], S[33], S[9], S[10], S[11]);
+	SMIX(S[27], S[28], S[29], S[30]);
+	CMIX36(S[24], S[25], S[26], S[28], S[29], S[30], S[6], S[7], S[8]);
+	SMIX(S[24], S[25], S[26], S[27]);
+	/* fall through */
+	TIX4(my_dec32be(cdata+4), S[24], S[25], S[28], S[31], S[32], S[10], S[12], S[15], S[18]);
+	CMIX36(S[21], S[22], S[23], S[25], S[26], S[27], S[3], S[4], S[5]);
+	SMIX(S[21], S[22], S[23], S[24]);
+	CMIX36(S[18], S[19], S[20], S[22], S[23], S[24], S[0], S[1], S[2]);
+	SMIX(S[18], S[19], S[20], S[21]);
+	CMIX36(S[15], S[16], S[17], S[19], S[20], S[21], S[33], S[34], S[35]);
+	SMIX(S[15], S[16], S[17], S[18]);
+	CMIX36(S[12], S[13], S[14], S[16], S[17], S[18], S[30], S[31], S[32]);
+	SMIX(S[12], S[13], S[14], S[15]);
+	/* fall through */
+	TIX4(my_dec32be(cdata+8), S[12], S[13], S[16], S[19], S[20], S[34], S[0], S[3], S[6]);
+	CMIX36(S[9], S[10], S[11], S[13], S[14], S[15], S[27], S[28], S[29]);
+	SMIX(S[9], S[10], S[11], S[12]);
+	CMIX36(S[6], S[7], S[8], S[10], S[11], S[12], S[24], S[25], S[26]);
+	SMIX(S[6], S[7], S[8], S[9]);
+	CMIX36(S[3], S[4], S[5], S[7], S[8], S[9], S[21], S[22], S[23]);
+	SMIX(S[3], S[4], S[5], S[6]);
+	CMIX36(S[0], S[1], S[2], S[4], S[5], S[6], S[18], S[19], S[20]);
+	SMIX(S[0], S[1], S[2], S[3]);
+	// x
+	TIX4(my_dec32be(cdata+12), S[0], S[1], S[4], S[7], S[8], S[22], S[24], S[27], S[30]);
+	CMIX36(S[33], S[34], S[35], S[1], S[2], S[3], S[15], S[16], S[17]);
+	SMIX(S[33], S[34], S[35], S[0]);
+	CMIX36(S[30], S[31], S[32], S[34], S[35], S[0], S[12], S[13], S[14]);
+	SMIX(S[30], S[31], S[32], S[33]);
+	CMIX36(S[27], S[28], S[29], S[31], S[32], S[33], S[9], S[10], S[11]);
+	SMIX(S[27], S[28], S[29], S[30]);
+	CMIX36(S[24], S[25], S[26], S[28], S[29], S[30], S[6], S[7], S[8]);
+	SMIX(S[24], S[25], S[26], S[27]);
+	/* fall through */
+	TIX4(my_dec32be(cdata+16), S[24], S[25], S[28], S[31], S[32], S[10], S[12], S[15], S[18]);
+	CMIX36(S[21], S[22], S[23], S[25], S[26], S[27], S[3], S[4], S[5]);
+	SMIX(S[21], S[22], S[23], S[24]);
+	CMIX36(S[18], S[19], S[20], S[22], S[23], S[24], S[0], S[1], S[2]);
+	SMIX(S[18], S[19], S[20], S[21]);
+	CMIX36(S[15], S[16], S[17], S[19], S[20], S[21], S[33], S[34], S[35]);
+	SMIX(S[15], S[16], S[17], S[18]);
+	CMIX36(S[12], S[13], S[14], S[16], S[17], S[18], S[30], S[31], S[32]);
+	SMIX(S[12], S[13], S[14], S[15]);
+	/* fall through */
+	TIX4(my_dec32be(cdata+20), S[12], S[13], S[16], S[19], S[20], S[34], S[0], S[3], S[6]);
+	CMIX36(S[9], S[10], S[11], S[13], S[14], S[15], S[27], S[28], S[29]);
+	SMIX(S[9], S[10], S[11], S[12]);
+	CMIX36(S[6], S[7], S[8], S[10], S[11], S[12], S[24], S[25], S[26]);
+	SMIX(S[6], S[7], S[8], S[9]);
+	CMIX36(S[3], S[4], S[5], S[7], S[8], S[9], S[21], S[22], S[23]);
+	SMIX(S[3], S[4], S[5], S[6]);
+	CMIX36(S[0], S[1], S[2], S[4], S[5], S[6], S[18], S[19], S[20]);
+	SMIX(S[0], S[1], S[2], S[3]);
+	TIX4(my_dec32be(cdata+24), S[0], S[1], S[4], S[7], S[8], S[22], S[24], S[27], S[30]);
+	CMIX36(S[33], S[34], S[35], S[1], S[2], S[3], S[15], S[16], S[17]);
+	SMIX(S[33], S[34], S[35], S[0]);
+	CMIX36(S[30], S[31], S[32], S[34], S[35], S[0], S[12], S[13], S[14]);
+	SMIX(S[30], S[31], S[32], S[33]);
+	CMIX36(S[27], S[28], S[29], S[31], S[32], S[33], S[9], S[10], S[11]);
+	SMIX(S[27], S[28], S[29], S[30]);
+	CMIX36(S[24], S[25], S[26], S[28], S[29], S[30], S[6], S[7], S[8]);
+	SMIX(S[24], S[25], S[26], S[27]);
+	/* fall through */
+	TIX4(my_dec32be(cdata+28), S[24], S[25], S[28], S[31], S[32], S[10], S[12], S[15], S[18]);
+	CMIX36(S[21], S[22], S[23], S[25], S[26], S[27], S[3], S[4], S[5]);
+	SMIX(S[21], S[22], S[23], S[24]);
+	CMIX36(S[18], S[19], S[20], S[22], S[23], S[24], S[0], S[1], S[2]);
+	SMIX(S[18], S[19], S[20], S[21]);
+	CMIX36(S[15], S[16], S[17], S[19], S[20], S[21], S[33], S[34], S[35]);
+	SMIX(S[15], S[16], S[17], S[18]);
+	CMIX36(S[12], S[13], S[14], S[16], S[17], S[18], S[30], S[31], S[32]);
+	SMIX(S[12], S[13], S[14], S[15]);
+	/* fall through */
+	TIX4(my_dec32be(cdata+32), S[12], S[13], S[16], S[19], S[20], S[34], S[0], S[3], S[6]);
+	CMIX36(S[9], S[10], S[11], S[13], S[14], S[15], S[27], S[28], S[29]);
+	SMIX(S[9], S[10], S[11], S[12]);
+	CMIX36(S[6], S[7], S[8], S[10], S[11], S[12], S[24], S[25], S[26]);
+	SMIX(S[6], S[7], S[8], S[9]);
+	CMIX36(S[3], S[4], S[5], S[7], S[8], S[9], S[21], S[22], S[23]);
+	SMIX(S[3], S[4], S[5], S[6]);
+	CMIX36(S[0], S[1], S[2], S[4], S[5], S[6], S[18], S[19], S[20]);
+	SMIX(S[0], S[1], S[2], S[3]);
+	// x
+	TIX4(my_dec32be(cdata+36), S[0], S[1], S[4], S[7], S[8], S[22], S[24], S[27], S[30]);
+	CMIX36(S[33], S[34], S[35], S[1], S[2], S[3], S[15], S[16], S[17]);
+	SMIX(S[33], S[34], S[35], S[0]);
+	CMIX36(S[30], S[31], S[32], S[34], S[35], S[0], S[12], S[13], S[14]);
+	SMIX(S[30], S[31], S[32], S[33]);
+	CMIX36(S[27], S[28], S[29], S[31], S[32], S[33], S[9], S[10], S[11]);
+	SMIX(S[27], S[28], S[29], S[30]);
+	CMIX36(S[24], S[25], S[26], S[28], S[29], S[30], S[6], S[7], S[8]);
+	SMIX(S[24], S[25], S[26], S[27]);
+	/* fall through */
+	TIX4(my_dec32be(cdata+40), S[24], S[25], S[28], S[31], S[32], S[10], S[12], S[15], S[18]);
+	CMIX36(S[21], S[22], S[23], S[25], S[26], S[27], S[3], S[4], S[5]);
+	SMIX(S[21], S[22], S[23], S[24]);
+	CMIX36(S[18], S[19], S[20], S[22], S[23], S[24], S[0], S[1], S[2]);
+	SMIX(S[18], S[19], S[20], S[21]);
+	CMIX36(S[15], S[16], S[17], S[19], S[20], S[21], S[33], S[34], S[35]);
+	SMIX(S[15], S[16], S[17], S[18]);
+	CMIX36(S[12], S[13], S[14], S[16], S[17], S[18], S[30], S[31], S[32]);
+	SMIX(S[12], S[13], S[14], S[15]);
+	/* fall through */
+	TIX4(my_dec32be(cdata+44), S[12], S[13], S[16], S[19], S[20], S[34], S[0], S[3], S[6]);
+	CMIX36(S[9], S[10], S[11], S[13], S[14], S[15], S[27], S[28], S[29]);
+	SMIX(S[9], S[10], S[11], S[12]);
+	CMIX36(S[6], S[7], S[8], S[10], S[11], S[12], S[24], S[25], S[26]);
+	SMIX(S[6], S[7], S[8], S[9]);
+	CMIX36(S[3], S[4], S[5], S[7], S[8], S[9], S[21], S[22], S[23]);
+	SMIX(S[3], S[4], S[5], S[6]);
+	CMIX36(S[0], S[1], S[2], S[4], S[5], S[6], S[18], S[19], S[20]);
+	SMIX(S[0], S[1], S[2], S[3]);
+	// x
+	TIX4(my_dec32be(cdata+48), S[0], S[1], S[4], S[7], S[8], S[22], S[24], S[27], S[30]);
+	CMIX36(S[33], S[34], S[35], S[1], S[2], S[3], S[15], S[16], S[17]);
+	SMIX(S[33], S[34], S[35], S[0]);
+	CMIX36(S[30], S[31], S[32], S[34], S[35], S[0], S[12], S[13], S[14]);
+	SMIX(S[30], S[31], S[32], S[33]);
+	CMIX36(S[27], S[28], S[29], S[31], S[32], S[33], S[9], S[10], S[11]);
+	SMIX(S[27], S[28], S[29], S[30]);
+	CMIX36(S[24], S[25], S[26], S[28], S[29], S[30], S[6], S[7], S[8]);
+	SMIX(S[24], S[25], S[26], S[27]);
+	/* fall through */
+	TIX4(my_dec32be(cdata+52), S[24], S[25], S[28], S[31], S[32], S[10], S[12], S[15], S[18]);
+	CMIX36(S[21], S[22], S[23], S[25], S[26], S[27], S[3], S[4], S[5]);
+	SMIX(S[21], S[22], S[23], S[24]);
+	CMIX36(S[18], S[19], S[20], S[22], S[23], S[24], S[0], S[1], S[2]);
+	SMIX(S[18], S[19], S[20], S[21]);
+	CMIX36(S[15], S[16], S[17], S[19], S[20], S[21], S[33], S[34], S[35]);
+	SMIX(S[15], S[16], S[17], S[18]);
+	CMIX36(S[12], S[13], S[14], S[16], S[17], S[18], S[30], S[31], S[32]);
+	SMIX(S[12], S[13], S[14], S[15]);
+	/* fall through */
+	TIX4(my_dec32be(cdata+56), S[12], S[13], S[16], S[19], S[20], S[34], S[0], S[3], S[6]);
+	CMIX36(S[9], S[10], S[11], S[13], S[14], S[15], S[27], S[28], S[29]);
+	SMIX(S[9], S[10], S[11], S[12]);
+	CMIX36(S[6], S[7], S[8], S[10], S[11], S[12], S[24], S[25], S[26]);
+	SMIX(S[6], S[7], S[8], S[9]);
+	CMIX36(S[3], S[4], S[5], S[7], S[8], S[9], S[21], S[22], S[23]);
+	SMIX(S[3], S[4], S[5], S[6]);
+	CMIX36(S[0], S[1], S[2], S[4], S[5], S[6], S[18], S[19], S[20]);
+	SMIX(S[0], S[1], S[2], S[3]);
 
-		if(rshift <= 0) {
-			q = p;
-			TIX4(q, S[0], S[1], S[4], S[7], S[8], S[22], S[24], S[27], S[30]);
-			CMIX36(S[33], S[34], S[35], S[1], S[2], S[3], S[15], S[16], S[17]);
-			SMIX(S[33], S[34], S[35], S[0]);
-			CMIX36(S[30], S[31], S[32], S[34], S[35], S[0], S[12], S[13], S[14]);
-			SMIX(S[30], S[31], S[32], S[33]);
-			CMIX36(S[27], S[28], S[29], S[31], S[32], S[33], S[9], S[10], S[11]);
-			SMIX(S[27], S[28], S[29], S[30]);
-			CMIX36(S[24], S[25], S[26], S[28], S[29], S[30], S[6], S[7], S[8]);
-			SMIX(S[24], S[25], S[26], S[27]);
-			NEXT(1);
-		}
-			/* fall through */
-		if(rshift <= 1) {
-			q = p;
-			TIX4(q, S[24], S[25], S[28], S[31], S[32], S[10], S[12], S[15], S[18]);
-			CMIX36(S[21], S[22], S[23], S[25], S[26], S[27], S[3], S[4], S[5]);
-			SMIX(S[21], S[22], S[23], S[24]);
-			CMIX36(S[18], S[19], S[20], S[22], S[23], S[24], S[0], S[1], S[2]);
-			SMIX(S[18], S[19], S[20], S[21]);
-			CMIX36(S[15], S[16], S[17], S[19], S[20], S[21], S[33], S[34], S[35]);
-			SMIX(S[15], S[16], S[17], S[18]);
-			CMIX36(S[12], S[13], S[14], S[16], S[17], S[18], S[30], S[31], S[32]);
-			SMIX(S[12], S[13], S[14], S[15]);
-			NEXT(2);
-		}
-			/* fall through */
-		if(rshift <= 2) {
-			q = p;
-			TIX4(q, S[12], S[13], S[16], S[19], S[20], S[34], S[0], S[3], S[6]);
-			CMIX36(S[9], S[10], S[11], S[13], S[14], S[15], S[27], S[28], S[29]);
-			SMIX(S[9], S[10], S[11], S[12]);
-			CMIX36(S[6], S[7], S[8], S[10], S[11], S[12], S[24], S[25], S[26]);
-			SMIX(S[6], S[7], S[8], S[9]);
-			CMIX36(S[3], S[4], S[5], S[7], S[8], S[9], S[21], S[22], S[23]);
-			SMIX(S[3], S[4], S[5], S[6]);
-			CMIX36(S[0], S[1], S[2], S[4], S[5], S[6], S[18], S[19], S[20]);
-			SMIX(S[0], S[1], S[2], S[3]);
-			NEXT(0);
-		}
-		}
-	//}
-	p = 0;
-	sc->partial_len = (unsigned)len;
-#pragma unroll
-	while (len -- > 0) {
-		p = (p << 8) | *(const unsigned char *)data;
-		data = (const unsigned char *)data + 1;
-	}
-	sc->partial = p;
-	sc->round_shift = rshift;
+	// moved from close
+	TIX4(my_dec32be(cdata+60), S[0], S[1], S[4], S[7], S[8], S[22], S[24], S[27], S[30]);
+	CMIX36(S[33], S[34], S[35], S[1], S[2], S[3], S[15], S[16], S[17]);
+	SMIX(S[33], S[34], S[35], S[0]);
+	CMIX36(S[30], S[31], S[32], S[34], S[35], S[0], S[12], S[13], S[14]);
+	SMIX(S[30], S[31], S[32], S[33]);
+	CMIX36(S[27], S[28], S[29], S[31], S[32], S[33], S[9], S[10], S[11]);
+	SMIX(S[27], S[28], S[29], S[30]);
+	CMIX36(S[24], S[25], S[26], S[28], S[29], S[30], S[6], S[7], S[8]);
+	SMIX(S[24], S[25], S[26], S[27]);
+	/* fall through */
+	TIX4(0, S[24], S[25], S[28], S[31], S[32], S[10], S[12], S[15], S[18]);
+	CMIX36(S[21], S[22], S[23], S[25], S[26], S[27], S[3], S[4], S[5]);
+	SMIX(S[21], S[22], S[23], S[24]);
+	CMIX36(S[18], S[19], S[20], S[22], S[23], S[24], S[0], S[1], S[2]);
+	SMIX(S[18], S[19], S[20], S[21]);
+	CMIX36(S[15], S[16], S[17], S[19], S[20], S[21], S[33], S[34], S[35]);
+	SMIX(S[15], S[16], S[17], S[18]);
+	CMIX36(S[12], S[13], S[14], S[16], S[17], S[18], S[30], S[31], S[32]);
+	SMIX(S[12], S[13], S[14], S[15]);
+	/* fall through */
+	TIX4(512, S[12], S[13], S[16], S[19], S[20], S[34], S[0], S[3], S[6]);
+	CMIX36(S[9], S[10], S[11], S[13], S[14], S[15], S[27], S[28], S[29]);
+	SMIX(S[9], S[10], S[11], S[12]);
+	CMIX36(S[6], S[7], S[8], S[10], S[11], S[12], S[24], S[25], S[26]);
+	SMIX(S[6], S[7], S[8], S[9]);
+	CMIX36(S[3], S[4], S[5], S[7], S[8], S[9], S[21], S[22], S[23]);
+	SMIX(S[3], S[4], S[5], S[6]);
+	CMIX36(S[0], S[1], S[2], S[4], S[5], S[6], S[18], S[19], S[20]);
+	SMIX(S[0], S[1], S[2], S[3]);
 }
-
 
 void
 enc64be(void *dst, ulong val)
@@ -639,46 +722,16 @@ void
 metis_close(metis_context *sc, void *dst)
 {
 	int i;
-	unsigned ub = 0;
-	unsigned n = 0;
-
-	unsigned char buf[16];
-	unsigned plen, rms;
 	unsigned char *out;
-	uint S[36];
-	plen = sc->partial_len;
-	enc64be(buf + 4, sc->bit_count + n);
-	if (plen == 0 && n == 0) {
-		plen = 4;
-	} else if (plen < 4 || n != 0) {
-		unsigned u;
+	uint *S = (sc->S);
 
-		if (plen == 4)
-			plen = 0;
-		buf[plen] = ub & ~(0xFFU >> n);
-		for (u = plen + 1; u < 4; u ++)
-			buf[u] = 0;
-	}
-	metis_core(sc, buf + plen, (sizeof buf) - plen);
-	rms = sc->round_shift * (12);
-//	memcpy(S, sc->S + (36) - rms, rms * sizeof(uint));
-#pragma unroll
-
-	for (i = 0; i < rms; i++) {
-		S[i] = (sc->S + (36) - rms)[i];
-	}
-//	memcpy(S + rms, sc->S, ((36) - rms) * sizeof(uint));
-#pragma unroll
-	for (i = 0; i < ((36) - rms); i++) {
-		(S + rms)[i] = (sc->S)[i];
-	}
-#pragma unroll
+	#pragma unroll
 	for (i = 0; i < 32; i ++) {
 		ror(S, 3);
 		CMIX36(S[0], S[1], S[2], S[4], S[5], S[6], S[18], S[19], S[20]);
 		SMIX(S[0], S[1], S[2], S[3]);
 	}
-#pragma unroll
+	#pragma unroll
 	for (i = 0; i < 13; i ++) {
 		S[4] ^= S[0];
 		S[9] ^= S[0];
