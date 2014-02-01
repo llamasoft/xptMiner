@@ -56,7 +56,9 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 	// measure time
 	for(uint32 n=0; n<0x1000; n++)
 	{
+#ifdef MEASURE_TIME
 		uint32 begin = getTimeMilliseconds();
+#endif
 		if( block->height != monitorCurrentBlockHeight )
 			break;
 
@@ -82,8 +84,10 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 		}
 
 		totalCollisionCount += 0x8000;
+#ifdef MEASURE_TIME
 		uint32 end = getTimeMilliseconds();
 		printf("Elapsed time: %d ms\n", (end-begin));
+#endif
 
 #ifdef VALIDATE_ALGORITHMS
 		// validator
