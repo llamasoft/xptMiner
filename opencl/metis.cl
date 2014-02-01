@@ -482,7 +482,10 @@ void metis_init(metis_context* sc) {
 		/* */ \
 	} while (0)
 
-#define my_dec32be(src) ((uint)((*((uchar4*)(src))).s3210))
+#define my_dec32be(src) 	(((uint)(((const unsigned char *)src)[0]) << 24) \
+							| ((uint)(((const unsigned char *)src)[1]) << 16) \
+							| ((uint)(((const unsigned char *)src)[2]) << 8) \
+							| (uint)(((const unsigned char *)src)[3]))
 
 void metis_core(metis_context *sc, const void *vdata, size_t len)
 {
@@ -698,7 +701,6 @@ void *memcpy(void *v_dst, const void *v_src, size_t c)
 	char *dst = v_dst;
 
 	/* Simple, byte oriented memcpy. */
-#pragma unroll
 	while (c--)
 		*dst++ = *src++;
 
