@@ -378,8 +378,10 @@ typedef struct {
 void metis_init(metis_context* sc) {
 	size_t u;
 
+#pragma unroll
 	for (u = 0; u < 20; u ++)
 		sc->S[u] = 0;
+#pragma unroll
 	for (int i = 0; i < 16; i++) {
 		sc->S[20+i] = IV512metis[i];
 	}
@@ -509,6 +511,7 @@ void metis_core(metis_context *sc, const void *data, size_t len)
 		if (len < count)
 			count = len;
 		plen += count;
+#pragma unroll
 		while (count -- > 0) {
 			p = (p << 8) | *(const unsigned char *)data;
 			data = (const unsigned char *)data + 1;
@@ -524,6 +527,7 @@ void metis_core(metis_context *sc, const void *data, size_t len)
 	rshift = sc->round_shift;
 	uint* S = sc->S;
 	//switch (rshift) {
+#pragma unroll
 		for (;;) {
 			uint q;
 
@@ -572,6 +576,7 @@ void metis_core(metis_context *sc, const void *data, size_t len)
 	//}
 	p = 0;
 	sc->partial_len = (unsigned)len;
+#pragma unroll
 	while (len -- > 0) {
 		p = (p << 8) | *(const unsigned char *)data;
 		data = (const unsigned char *)data + 1;
@@ -610,6 +615,7 @@ void *memcpy(void *v_dst, const void *v_src, size_t c)
 	char *dst = v_dst;
 
 	/* Simple, byte oriented memcpy. */
+#pragma unroll
 	while (c--)
 		*dst++ = *src++;
 
@@ -618,9 +624,11 @@ void *memcpy(void *v_dst, const void *v_src, size_t c)
 
 void ror(uint* S, size_t n) {
 	uint tmp[36];
+#pragma unroll
 	for (int i = 0; i < 36; i++) {
 		tmp[(i+n)%36] = S[i];
 	}
+#pragma unroll
 	for (int i = 0; i < 36; i++) {
 		S[i] = tmp[i];
 	}
@@ -654,18 +662,23 @@ metis_close(metis_context *sc, void *dst)
 	metis_core(sc, buf + plen, (sizeof buf) - plen);
 	rms = sc->round_shift * (12);
 //	memcpy(S, sc->S + (36) - rms, rms * sizeof(uint));
+#pragma unroll
+
 	for (i = 0; i < rms; i++) {
 		S[i] = (sc->S + (36) - rms)[i];
 	}
 //	memcpy(S + rms, sc->S, ((36) - rms) * sizeof(uint));
+#pragma unroll
 	for (i = 0; i < ((36) - rms); i++) {
 		(S + rms)[i] = (sc->S)[i];
 	}
+#pragma unroll
 	for (i = 0; i < 32; i ++) {
 		ror(S, 3);
 		CMIX36(S[0], S[1], S[2], S[4], S[5], S[6], S[18], S[19], S[20]);
 		SMIX(S[0], S[1], S[2], S[3]);
 	}
+#pragma unroll
 	for (i = 0; i < 13; i ++) {
 		S[4] ^= S[0];
 		S[9] ^= S[0];
