@@ -120,10 +120,10 @@ kernel void metis_step(global ulong* in, global uint* out, global uint* outcount
 	metis_core_64(&ctx_metis, hash0);
 	metis_close(&ctx_metis, hash1);
 
-	// for debug
-	for (int i = 0; i < 8; i++) {
-		in[(id * 8)+i] = hash1[i];
-	}
+//	// for debug
+//	for (int i = 0; i < 8; i++) {
+//		in[(id * 8)+i] = hash1[i];
+//	}
 
 	if( *(uint*)((uchar*)hash1+28) <= target )
 	{
