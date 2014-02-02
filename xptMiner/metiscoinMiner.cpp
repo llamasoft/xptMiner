@@ -94,24 +94,24 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 #endif
 		// metis
 		// metis_step(global ulong* in, global uint* out, global uint* outcount, uint begin_nonce, uint target) {
-		kernel_metis->resetArgs();
-		kernel_metis->addGlobalArg(hashes);
-		kernel_metis->addGlobalArg(out);
-		kernel_metis->addGlobalArg(out_count);
-		kernel_metis->addScalarUInt(n*0x8000);
-		kernel_metis->addScalarUInt(target);
-
-		cl_uint out_count_tmp = 0;
-		q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
-		q->enqueueKernel1D(kernel_metis, 0x8000, kernel_metis->getWorkGroupSize(OpenCLMain::getInstance().getDevice(0)));
-		q->enqueueReadBuffer(out, out_tmp, sizeof(cl_uint) * 255);
-		q->enqueueReadBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
+//		kernel_metis->resetArgs();
+//		kernel_metis->addGlobalArg(hashes);
+//		kernel_metis->addGlobalArg(out);
+//		kernel_metis->addGlobalArg(out_count);
+//		kernel_metis->addScalarUInt(n*0x8000);
+//		kernel_metis->addScalarUInt(target);
+//
+//		cl_uint out_count_tmp = 0;
+//		q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
+//		q->enqueueKernel1D(kernel_metis, 0x8000, kernel_metis->getWorkGroupSize(OpenCLMain::getInstance().getDevice(0)));
+//		q->enqueueReadBuffer(out, out_tmp, sizeof(cl_uint) * 255);
+//		q->enqueueReadBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 		q->finish();
-
-		for (int i = 0; i < out_count_tmp; i++) {
-			block->nonce = out_tmp[i];
-			xptMiner_submitShare(block);
-		}
+//
+//		for (int i = 0; i < out_count_tmp; i++) {
+//			block->nonce = out_tmp[i];
+//			xptMiner_submitShare(block);
+//		}
 
 		totalCollisionCount += 0x8000;
 #ifdef MEASURE_TIME
@@ -144,11 +144,9 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 			sph_keccak512_close(&ctx_keccak, hash0);
 			sph_shavite512(&ctx_shavite, hash0, 64);
 			sph_shavite512_close(&ctx_shavite, hash1);
-			sph_metis512(&ctx_metis, hash1, 64);
-			sph_metis512_close(&ctx_metis, hash2);
 
 			for (int i = 0; i < 8; i++) {
-				if (hash2[i] != tmp_hashes[(8*f)+i]) {
+				if (hash1[i] != tmp_hashes[(8*f)+i]) {
 					printf ("**** Hashes do not match %i %lx %lx\n", i, hash2[i], tmp_hashes[(8*f)+i]);
 				}
 			}

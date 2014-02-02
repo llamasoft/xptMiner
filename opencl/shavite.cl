@@ -4,9 +4,7 @@
 
 typedef struct {
 	unsigned char buf[128];    /* first field, for alignment */
-	size_t ptr;
 	uint h[16];
-	uint count0, count1, count2, count3;
 } shavite_context;
 
 #define C32(x)    ((uint)(x))
@@ -21,14 +19,8 @@ __constant const uint IV512shavite[] = {
 static void
 shavite_init(shavite_context *sc)
 {
-	// cannot use memcpy on different addr space
-	//memcpy(sc->h, IV512, sizeof sc->h);
+#pragma unroll
 	for (int i = 0; i < 16; i++) sc->h[i] = IV512shavite[i];
-	sc->ptr = 0;
-	sc->count0 = 0;
-	sc->count1 = 0;
-	sc->count2 = 0;
-	sc->count3 = 0;
 }
 
 #define SPH_T32(x)    ((x) & SPH_C32(0xFFFFFFFF))
@@ -354,19 +346,15 @@ __constant uint AES3[256] = {
 	AESx(0x7BCBB0B0), AESx(0xA8FC5454), AESx(0x6DD6BBBB), AESx(0x2C3A1616)
 };
 
-uint
-sph_dec32le_aligned(const void *src)
-{
-	return (uint)(((const unsigned char *)src)[0])
-		| ((uint)(((const unsigned char *)src)[1]) << 8)
-		| ((uint)(((const unsigned char *)src)[2]) << 16)
-		| ((uint)(((const unsigned char *)src)[3]) << 24);
-}
+#define sph_dec32le_aligned(src) ((uint)(((const unsigned char *)(src))[0]) \
+		| ((uint)(((const unsigned char *)(src))[1]) << 8) \
+		| ((uint)(((const unsigned char *)(src))[2]) << 16) \
+		| ((uint)(((const unsigned char *)(src))[3]) << 24))
 
 /*
  * This function assumes that "msg" is aligned for 32-bit access.
  */
-static void
+inline void
 c512(shavite_context *sc, const void *msg)
 {
 	uint p0, p1, p2, p3, p4, p5, p6, p7;
@@ -476,6 +464,7 @@ c512(shavite_context *sc, const void *msg)
 	pA ^= x2;
 	pB ^= x3;
 
+#pragma unroll
 	for (r = 0; r < 3; r ++) {
 		/* round 1, 5, 9 */
 		KEY_EXPAND_ELT(rk00, rk01, rk02, rk03);
@@ -484,10 +473,8 @@ c512(shavite_context *sc, const void *msg)
 		rk02 ^= rk1E;
 		rk03 ^= rk1F;
 		if (r == 0) {
-			rk00 ^= sc->count0;
-			rk01 ^= sc->count1;
-			rk02 ^= sc->count2;
-			rk03 ^= SPH_T32(~sc->count3);
+			rk00 ^= 512;
+			rk03 ^= 0xFFFFFFFF;
 		}
 		x0 = p0 ^ rk00;
 		x1 = p1 ^ rk01;
@@ -500,10 +487,7 @@ c512(shavite_context *sc, const void *msg)
 		rk06 ^= rk02;
 		rk07 ^= rk03;
 		if (r == 1) {
-			rk04 ^= sc->count3;
-			rk05 ^= sc->count2;
-			rk06 ^= sc->count1;
-			rk07 ^= SPH_T32(~sc->count0);
+			rk07 ^= 0xfffffdff;
 		}
 		x0 ^= rk04;
 		x1 ^= rk05;
@@ -570,10 +554,8 @@ c512(shavite_context *sc, const void *msg)
 		rk1E ^= rk1A;
 		rk1F ^= rk1B;
 		if (r == 2) {
-			rk1C ^= sc->count2;
-			rk1D ^= sc->count3;
-			rk1E ^= sc->count0;
-			rk1F ^= SPH_T32(~sc->count1);
+			rk1E ^= 512;
+			rk1F ^= 0xffffffff;
 		}
 		x0 ^= rk1C;
 		x1 ^= rk1D;
@@ -902,10 +884,10 @@ c512(shavite_context *sc, const void *msg)
 	x3 ^= rk17;
 	AES_ROUND_NOKEY(x0, x1, x2, x3);
 	KEY_EXPAND_ELT(rk18, rk19, rk1A, rk1B);
-	rk18 ^= rk14 ^ sc->count1;
-	rk19 ^= rk15 ^ sc->count0;
-	rk1A ^= rk16 ^ sc->count3;
-	rk1B ^= rk17 ^ SPH_T32(~sc->count2);
+	rk18 ^= rk14;
+	rk19 ^= rk15 ^ 512;
+	rk1A ^= rk16;
+	rk1B ^= rk17 ^ 0xffffffff;
 	x0 ^= rk18;
 	x1 ^= rk19;
 	x2 ^= rk1A;
@@ -945,42 +927,10 @@ c512(shavite_context *sc, const void *msg)
 
 
 void
-shavite_core(shavite_context *sc, const void *data, size_t len)
+shavite_core_64(shavite_context *sc, const void *data)
 {
-	unsigned char *buf;
-	size_t ptr;
-
-	buf = sc->buf;
-	ptr = sc->ptr;
-	while (len > 0) {
-		size_t clen;
-
-		clen = (sizeof sc->buf) - ptr;
-		if (clen > len)
-			clen = len;
-		//memcpy(buf + ptr, data, clen);
-		for (int ii = 0; ii < clen; ii++) {
-			(buf + ptr)[ii] = ((unsigned char*)data)[ii];
-		}
-		data = (const unsigned char *)data + clen;
-		ptr += clen;
-		len -= clen;
-		if (ptr == sizeof sc->buf) {
-			if ((sc->count0 = SPH_T32(sc->count0 + 1024)) == 0) {
-				sc->count1 = SPH_T32(sc->count1 + 1);
-				if (sc->count1 == 0) {
-					sc->count2 = SPH_T32(sc->count2 + 1);
-					if (sc->count2 == 0) {
-						sc->count3 = SPH_T32(
-							sc->count3 + 1);
-					}
-				}
-			}
-			c512(sc, buf);
-			ptr = 0;
-		}
-	}
-	sc->ptr = ptr;
+	((ulong8*)sc->buf)[0] = *((ulong8*)data);
+	((ulong8*)sc->buf)[1] = 0;
 }
 
 void
@@ -995,57 +945,17 @@ enc32le(void *dst, uint val)
 void
 shavite_close(shavite_context *sc, void *dst)
 {
-	unsigned ub = 0;
-	unsigned n = 0;
-	size_t out_size_w32 = 16;
-
 	unsigned char *buf;
-	size_t ptr, u;
-	unsigned z;
-	uint count0, count1, count2, count3;
 
 	buf = sc->buf;
-	ptr = sc->ptr;
-	count0 = (sc->count0 += (ptr << 3) + n);
-	count1 = sc->count1;
-	count2 = sc->count2;
-	count3 = sc->count3;
-	z = 0x80 >> n;
-	z = ((ub & -z) | z) & 0xFF;
-	if (ptr == 0 && n == 0) {
-		buf[0] = 0x80;
-		//memset(buf + 1, 0, 109);
-		for (int ii = 0; ii < 109; ii++) {
-			(buf + 1)[ii] = 0;
-		}
-		sc->count0 = sc->count1 = sc->count2 = sc->count3 = 0;
-	} else if (ptr < 110) {
-		buf[ptr ++] = z;
-		//memset(buf + ptr, 0, 110 - ptr);
-		for (int ii = 0; ii < (110 - ptr); ii++) {
-			(buf + ptr)[ii] = 0;
-		}
-	} else {
-		buf[ptr ++] = z;
-		//memset(buf + ptr, 0, 128 - ptr);
-		for (int ii = 0; ii < (128 - ptr); ii++) {
-			(buf + ptr)[ii] = 0;
-		}
-		c512(sc, buf);
-		//memset(buf, 0, 110);
-		for (int ii = 0; ii < 110; ii++) {
-			buf[ii] = 0;
-		}
-		sc->count0 = sc->count1 = sc->count2 = sc->count3 = 0;
-	}
-	enc32le(buf + 110, count0);
-	enc32le(buf + 114, count1);
-	enc32le(buf + 118, count2);
-	enc32le(buf + 122, count3);
-	buf[126] = out_size_w32 << 5;
-	buf[127] = out_size_w32 >> 3;
+	buf[64] = 0x80;
+	//enc32le(buf + 110, 512); -> buff[110-113] = (0, 2, 0, 0);
+	buf[111] = 2;
+	buf[126] = 512;
+	buf[127] = 2;
 	c512(sc, buf);
-	for (u = 0; u < out_size_w32; u ++)
+	#pragma unroll
+	for (int u = 0; u < 16; u ++)
 		enc32le((unsigned char *)dst + (u << 2), sc->h[u]);
 }
 
@@ -1057,7 +967,7 @@ kernel void shavite512(global ulong * in, global ulong * out) {
 
 	shavite_init(&ctx);
 	for (int i = 0; i < 8; i++) data[i] = in[i];
-	shavite_core(&ctx, data, 64);
+	shavite_core_64(&ctx, data);
 	shavite_close(&ctx, hash);
 	for (int i = 0; i < 8; i++) out[i] = hash[i];
 }

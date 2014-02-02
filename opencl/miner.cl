@@ -35,7 +35,7 @@ kernel void metiscoin_process(global char* in, global uint* out, global uint* ou
 
 	// shavite
 	shavite_init(&ctx_shavite);
-	shavite_core(&ctx_shavite, hash0, 64);
+	shavite_core_64(&ctx_shavite, hash0);
 	shavite_close(&ctx_shavite, hash1);
 
 	// metis
@@ -93,7 +93,7 @@ kernel void shavite_step(global ulong* in_out) {
 	}
 
 	shavite_init(&ctx_shavite);
-	shavite_core(&ctx_shavite, hash0, 64);
+	shavite_core_64(&ctx_shavite, hash0);
 	shavite_close(&ctx_shavite, hash1);
 
 	for (int i = 0; i < 8; i++) {
