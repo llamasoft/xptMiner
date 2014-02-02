@@ -487,7 +487,7 @@ void metis_init(metis_context* sc) {
 							| ((uint)(((const unsigned char *)src)[2]) << 8) \
 							| (uint)(((const unsigned char *)src)[3]))
 
-void metis_core(metis_context *sc, const void *vdata, size_t len)
+void metis_core_64(metis_context *sc, const void *vdata)
 {
 	const unsigned char * cdata = (const unsigned char *)vdata;
 	uint* S = sc->S;
@@ -695,18 +695,6 @@ enc32be(void *dst, uint val)
 	((unsigned char *)dst)[3] = val;
 }
 
-void *memcpy(void *v_dst, const void *v_src, size_t c)
-{
-	const char *src = v_src;
-	char *dst = v_dst;
-
-	/* Simple, byte oriented memcpy. */
-	while (c--)
-		*dst++ = *src++;
-
-	return v_dst;
-}
-
 void ror(uint* S, size_t n) {
 	uint tmp[36];
 #pragma unroll
@@ -719,6 +707,47 @@ void ror(uint* S, size_t n) {
 	}
 }
 
+void ror3(uint* S) {
+	uint T[3] = {S[34], S[35], S[36]};
+
+	S[36] = S[33];
+	S[35] = S[32];
+	S[34] = S[31];
+	S[33] = S[30];
+	S[32] = S[29];
+	S[31] = S[28];
+	S[30] = S[27];
+	S[29] = S[26];
+	S[28] = S[25];
+	S[27] = S[24];
+	S[26] = S[23];
+	S[25] = S[22];
+	S[24] = S[21];
+	S[23] = S[20];
+	S[22] = S[19];
+	S[21] = S[18];
+	S[20] = S[17];
+	S[19] = S[16];
+	S[18] = S[15];
+	S[17] = S[14];
+	S[16] = S[13];
+	S[15] = S[12];
+	S[14] = S[11];
+	S[13] = S[10];
+	S[12] = S[9];
+	S[11] = S[8];
+	S[10] = S[7];
+	S[9] = S[6];
+	S[8] = S[5];
+	S[7] = S[4];
+	S[6] = S[3];
+	S[5] = S[2];
+	S[4] = S[1];
+	S[3] = S[0];
+	S[2] = T[3];
+	S[1] = T[2];
+	S[0] = T[1];
+}
 
 void
 metis_close(metis_context *sc, void *dst)
@@ -801,7 +830,7 @@ kernel void metis_update_g(global metis_context* ctx_g, global char* data_g) {
 		data[i] = data_g[i];
 	}
 
-	metis_core(&ctx, data, 64);
+	metis_core_64(&ctx, data);
 
 	(*ctx_g) = ctx;
 }
@@ -813,7 +842,7 @@ kernel void metis512(global ulong * in, global ulong * out) {
 	metis_context ctx;
 	metis_init(&ctx);
 	for (int i = 0; i < 8; i++) data[i] = in[i];
-	metis_core(&ctx, data, 64);
+	metis_core_64(&ctx, data);
 	metis_close(&ctx, hash);
 	for (int i = 0; i < 8; i++) out[i] = hash[i];
 }
