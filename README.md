@@ -1,10 +1,11 @@
-xptMiner
+GPU Metis miner based on xptMiner
 ========
 
-xptMiner is a multi-algorithm miner and reference implementation of the xpt protocol. It currently supports Protoshares, Metiscoin and Scrypt (slow)
-For this project I tried to focus on clean code as well merging all the various algorithms into a single project. While performance is only secondary, I'll do speed optimizations if time allows.
+xptMiner is a multi-algorithm miner and reference implementation of the xpt protocol.
+
+This is a GPU implementation of Metiscoin Algorithm based on it.
 
 for now here's a windows executables
-https://dl.dropboxusercontent.com/u/105316582/xptMiner-clintarWin.zip
+https://www.dropbox.com/sh/2wv2awwgebpdo0m/STzOU5tlXa
 
-This has a 1% donation which can be set using the -d option (-d 2.5 would be 2.5% donation)
+This has a 2.5% donation which can be set using the -d option (-d 2.5 would be 2.5% donation)
