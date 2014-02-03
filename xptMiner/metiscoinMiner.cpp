@@ -3,13 +3,14 @@
 #include "ticker.h"
 
 OpenCLKernel* kernel_all;
-OpenCLKernel* kernel_keccak;
+OpenCLKernel* kernel_keccak_noinit;
 OpenCLKernel* kernel_shavite;
 OpenCLKernel* kernel_metis;
 #ifdef VALIDATE_ALGORITHMS
 OpenCLKernel* kernel_validate;
 #endif
-OpenCLBuffer* in;
+OpenCLBuffer* u;
+OpenCLBuffer* buff;
 OpenCLBuffer* hashes;
 OpenCLBuffer* out;
 OpenCLBuffer* out_count;
@@ -37,7 +38,7 @@ void metiscoin_init_opencl(int device_num) {
 	files_keccak.push_back("opencl/miner.cl");
 	OpenCLProgram* program = main.getDevice(0)->getContext()->loadProgramFromFiles(files_keccak);
 	kernel_all = program->getKernel("metiscoin_process");
-	kernel_keccak = program->getKernel("keccak_step");
+	kernel_keccak_noinit = program->getKernel("keccak_step_noinit");
 	kernel_shavite = program->getKernel("shavite_step");
 	kernel_metis = program->getKernel("metis_step");
 #ifdef VALIDATE_ALGORITHMS
@@ -46,11 +47,19 @@ void metiscoin_init_opencl(int device_num) {
 
 	main.listDevices();
 
-	in = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(80, CL_MEM_READ_WRITE, NULL);
+	u = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(25*sizeof(cl_ulong), CL_MEM_READ_WRITE, NULL);
+	buff = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(4, CL_MEM_READ_WRITE, NULL);
+
 	hashes = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(64*0x8000, CL_MEM_READ_WRITE, NULL);
 	out = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(sizeof(cl_uint) * 255, CL_MEM_READ_WRITE, NULL);
 	out_count = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(sizeof(cl_uint), CL_MEM_READ_WRITE, NULL);
 	q = OpenCLMain::getInstance().getDevice(0)->getContext()->createCommandQueue(OpenCLMain::getInstance().getDevice(0));
+}
+
+static inline cl_uint my_swap32(cl_uint x)
+{
+  return ((((x)&    0xFF)<<24) | (((x)&    0xFF00)<<8) | \
+	  (((x)&0xFF0000)>> 8) | (((x)&0xFF000000)>>24));
 }
 
 void metiscoin_process(minerMetiscoinBlock_t* block)
@@ -69,19 +78,26 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 			break;
 
 		//keccak
-		//kernel void keccak_step(constant const char* in, global ulong* out, uint begin_nonce)
-		kernel_keccak->resetArgs();
-		kernel_keccak->addGlobalArg(in);
-		kernel_keccak->addGlobalArg(hashes);
-		kernel_keccak->addScalarUInt(n*0x8000);
+		//kernel void keccak_step_noinit(constant const ulong* u, constant const char* buff, global ulong* out, uint begin_nonce)
+		kernel_keccak_noinit->resetArgs();
+		kernel_keccak_noinit->addGlobalArg(u);
+		kernel_keccak_noinit->addGlobalArg(buff);
+		kernel_keccak_noinit->addGlobalArg(hashes);
+		kernel_keccak_noinit->addScalarUInt(n*0x8000);
 
-		q->enqueueWriteBuffer(in, &block->version, 80);
-		q->enqueueKernel1D(kernel_keccak, 0x8000, kernel_keccak->getWorkGroupSize(OpenCLMain::getInstance().getDevice(0)));
+		sph_keccak512_context	 ctx_keccak;
+		sph_keccak512_init(&ctx_keccak);
+		sph_keccak512(&ctx_keccak, &block->version, 80);
+
+		q->enqueueWriteBuffer(u, ctx_keccak.u.wide, 25*sizeof(cl_ulong));
+		q->enqueueWriteBuffer(buff, ctx_keccak.buf, 4);
+		q->enqueueKernel1D(kernel_keccak_noinit, 0x8000, kernel_keccak_noinit->getWorkGroupSize(OpenCLMain::getInstance().getDevice(0)));
 
 #ifdef MEASURE_TIME
 		q->finish();
 		uint32 end_keccak = getTimeMilliseconds();
 #endif
+
 		// shavite
 		kernel_shavite->resetArgs();
 		kernel_shavite->addGlobalArg(hashes);
@@ -121,7 +137,7 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 
 #ifdef VALIDATE_ALGORITHMS
 		uint32 begin_validation = getTimeMilliseconds();
-		// reads
+
 		cl_ulong *tmp_hashes = new cl_ulong[8*0x8000];
 		q->enqueueReadBuffer(hashes, tmp_hashes, sizeof(cl_ulong)*8*0x8000);
 		q->finish();
@@ -132,22 +148,37 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 			sph_keccak512_context	 ctx_keccak;
 			sph_shavite512_context	 ctx_shavite;
 			sph_metis512_context	 ctx_metis;
-			uint64 hash0[8];
-			uint64 hash1[8];
-			uint64 hash2[8];
-			uint64 hash2_2[8];
+			cl_ulong hash0[8];
+			cl_ulong hash1[8];
+			cl_ulong hash2[8];
+			cl_ulong *hash1_2;
+			cl_ulong *hash2_2;
 
 			sph_keccak512_init(&ctx_keccak);
 			sph_shavite512_init(&ctx_shavite);
 			sph_metis512_init(&ctx_metis);
 			sph_keccak512(&ctx_keccak, &block->version, 80);
+
+//			// printf contents of ctx
+//			printf ("lim = %d\n",ctx_keccak.lim);
+//			printf ("ptr = %d\n",ctx_keccak.ptr);
+//			for (int i = 0; i < ctx_keccak.ptr; i++) {
+//				printf ("buff[%d] = %X\n",i,ctx_keccak.buf[i]);
+//			}
+//			printf ("nonce = %X\n", block->nonce);
+//			for (int i = 0; i < 25; i++) {
+//				printf ("u[%d] = %lX\n",i,ctx_keccak.u.wide[i]);
+//			}
+
 			sph_keccak512_close(&ctx_keccak, hash0);
 			sph_shavite512(&ctx_shavite, hash0, 64);
 			sph_shavite512_close(&ctx_shavite, hash1);
 
+			hash2_2 = tmp_hashes+(f*8);
+
 			for (int i = 0; i < 8; i++) {
-				if (hash1[i] != tmp_hashes[(8*f)+i]) {
-					printf ("**** Hashes do not match %i %lx %lx\n", i, hash2[i], tmp_hashes[(8*f)+i]);
+				if (hash1[i] != hash2_2[i]) {
+					printf ("**** Hashes do not match %i %x %x\n", i, hash0[i], hash2_2[i]);
 				}
 			}
 

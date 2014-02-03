@@ -30,7 +30,7 @@ kernel void metiscoin_process(global char* in, global uint* out, global uint* ou
 
 	// keccak
 	keccak_init(&ctx_keccak);
-	keccak_core(&ctx_keccak, data, 80);
+	keccak_core_80(&ctx_keccak, data);
 	keccak_close(&ctx_keccak, hash0);
 
 	// shavite
@@ -71,9 +71,39 @@ kernel void keccak_step(constant const char* in, global ulong* out, uint begin_n
 
 	// keccak
 	keccak_init(&ctx_keccak);
-	keccak_core(&ctx_keccak, data, 80);
+	keccak_core_80(&ctx_keccak, data);
 	keccak_close(&ctx_keccak, hash);
 
+	for (int i = 0; i < 8; i++) {
+		out[(id * 8)+i] = hash[i];
+	}
+}
+
+kernel void keccak_step_noinit(constant const ulong* u, constant const char* buff, global ulong* out, uint begin_nonce) {
+
+	size_t id = get_global_id(0);
+	uint nonce = (uint)id + begin_nonce;
+
+	ulong hash[8];
+
+	// inits context
+	keccak_context	 ctx_keccak;
+	ctx_keccak.lim = 72;
+	ctx_keccak.ptr = 8;
+#pragma unroll
+	for (int i = 0; i < 4; i++) {
+		ctx_keccak.buf[i] = buff[i];
+	}
+	*((uint*)(ctx_keccak.buf+4)) = nonce;
+#pragma unroll
+	for (int i = 0; i < 25; i++) {
+		ctx_keccak.u.wide[i] = u[i];
+	}
+
+	// keccak
+	keccak_close(&ctx_keccak, hash);
+
+#pragma unroll
 	for (int i = 0; i < 8; i++) {
 		out[(id * 8)+i] = hash[i];
 	}

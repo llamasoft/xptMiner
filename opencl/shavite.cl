@@ -346,10 +346,12 @@ __constant uint AES3[256] = {
 	AESx(0x7BCBB0B0), AESx(0xA8FC5454), AESx(0x6DD6BBBB), AESx(0x2C3A1616)
 };
 
-#define sph_dec32le_aligned(src) ((uint)(((const unsigned char *)(src))[0]) \
-		| ((uint)(((const unsigned char *)(src))[1]) << 8) \
-		| ((uint)(((const unsigned char *)(src))[2]) << 16) \
-		| ((uint)(((const unsigned char *)(src))[3]) << 24))
+//#define sph_dec32le_aligned(src) ((uint)(((const unsigned char *)(src))[0]) \
+//		| ((uint)(((const unsigned char *)(src))[1]) << 8) \
+//		| ((uint)(((const unsigned char *)(src))[2]) << 16) \
+//		| ((uint)(((const unsigned char *)(src))[3]) << 24))
+
+#define sph_dec32le_aligned(x) (*((uint*)(x)))
 
 /*
  * This function assumes that "msg" is aligned for 32-bit access.
@@ -933,14 +935,16 @@ shavite_core_64(shavite_context *sc, const void *data)
 	((ulong8*)sc->buf)[1] = 0;
 }
 
-void
-enc32le(void *dst, uint val)
-{
-	((unsigned char *)dst)[0] = val;
-	((unsigned char *)dst)[1] = (val >> 8);
-	((unsigned char *)dst)[2] = (val >> 16);
-	((unsigned char *)dst)[3] = (val >> 24);
-}
+//void
+//enc32le(void *dst, uint val)
+//{
+//	((unsigned char *)dst)[0] = val;
+//	((unsigned char *)dst)[1] = (val >> 8);
+//	((unsigned char *)dst)[2] = (val >> 16);
+//	((unsigned char *)dst)[3] = (val >> 24);
+//}
+
+#define enc32le(dst, val) (*((uint*)(dst)) = (val))
 
 void
 shavite_close(shavite_context *sc, void *dst)

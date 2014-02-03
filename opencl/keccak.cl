@@ -54,30 +54,34 @@ constant ulong RC[] = {
 #define a34   (kc->u.wide[23])
 #define a44   (kc->u.wide[24])
 
-ulong
-dec64le_aligned(const void *src)
-{
-	return (ulong)(((const unsigned char *)src)[0])
-		| ((ulong)(((const unsigned char *)src)[1]) << 8)
-		| ((ulong)(((const unsigned char *)src)[2]) << 16)
-		| ((ulong)(((const unsigned char *)src)[3]) << 24)
-		| ((ulong)(((const unsigned char *)src)[4]) << 32)
-		| ((ulong)(((const unsigned char *)src)[5]) << 40)
-		| ((ulong)(((const unsigned char *)src)[6]) << 48)
-		| ((ulong)(((const unsigned char *)src)[7]) << 56);
-}
+//ulong
+//dec64le_aligned(const void *src)
+//{
+//	return (ulong)(((const unsigned char *)src)[0])
+//		| ((ulong)(((const unsigned char *)src)[1]) << 8)
+//		| ((ulong)(((const unsigned char *)src)[2]) << 16)
+//		| ((ulong)(((const unsigned char *)src)[3]) << 24)
+//		| ((ulong)(((const unsigned char *)src)[4]) << 32)
+//		| ((ulong)(((const unsigned char *)src)[5]) << 40)
+//		| ((ulong)(((const unsigned char *)src)[6]) << 48)
+//		| ((ulong)(((const unsigned char *)src)[7]) << 56);
+//}
 
-void
-enc64le_aligned(void *dst, ulong val) {
-	((unsigned char *)dst)[0] = val;
-	((unsigned char *)dst)[1] = (val >> 8);
-	((unsigned char *)dst)[2] = (val >> 16);
-	((unsigned char *)dst)[3] = (val >> 24);
-	((unsigned char *)dst)[4] = (val >> 32);
-	((unsigned char *)dst)[5] = (val >> 40);
-	((unsigned char *)dst)[6] = (val >> 48);
-	((unsigned char *)dst)[7] = (val >> 56);
-}
+#define dec64le_aligned(x) (*((ulong*)(x)))
+
+//void
+//enc64le_aligned(void *dst, ulong val) {
+//	((unsigned char *)dst)[0] = val;
+//	((unsigned char *)dst)[1] = (val >> 8);
+//	((unsigned char *)dst)[2] = (val >> 16);
+//	((unsigned char *)dst)[3] = (val >> 24);
+//	((unsigned char *)dst)[4] = (val >> 32);
+//	((unsigned char *)dst)[5] = (val >> 40);
+//	((unsigned char *)dst)[6] = (val >> 48);
+//	((unsigned char *)dst)[7] = (val >> 56);
+//}
+
+#define enc64le_aligned(dst, val) (*((ulong*)(dst)) = (val))
 
 #define INPUT_BUF(size)   do { \
 		size_t j; \
@@ -336,6 +340,7 @@ keccak_init(keccak_context *kc)
 {
 	int i;
 
+#pragma unroll
 	for (i = 0; i < 25; i ++)
 		kc->u.wide[i] = 0;
 	/*
@@ -351,77 +356,63 @@ keccak_init(keccak_context *kc)
 	kc->lim = 200 - (512 >> 2);
 }
 
-void keccak_core(keccak_context *kc, const void *data, size_t len)
+void keccak_core_80(keccak_context *kc, const void *data)
 {
 	unsigned char *buf;
-	size_t ptr;
 
 	buf = kc->buf;
-	ptr = kc->ptr;
 
-	if (len < (72 - ptr)) {
-		//memcpy(buf + ptr, data, len);
-		for (int i = 0; i < len; i++) {
-			(buf + ptr)[i] = ((uchar*)data)[i];
-		}
-		kc->ptr = ptr + len;
-		return;
+// two passes
+	size_t clen = 72;
+#pragma unroll
+	for (int i = 0; i < 72; i++) buf[i] = ((const unsigned char *)data)[i];
+	data = (const unsigned char *)data + 72;
+#pragma unroll
+	for (size_t j = 0; j < 9; j ++) {
+		kc->u.wide[j] ^= dec64le_aligned(buf + (j<<3));
+	}
+#pragma unroll
+	for (int j = 0; j < 24; j ++) {
+		KF_ELT01(RC[j + 0]);
+		P1_TO_P0;
 	}
 
-	while (len > 0) {
-		size_t clen;
+	*((uchar8*)buf) = *((uchar8*)data);
+	kc->ptr = 8;
+}
 
-		clen = (72 - ptr);
-		if (clen > len)
-			clen = len;
-		//memcpy(buf + ptr, data, clen);
-		for (int i = 0; i < clen; i++) buf[ptr+i] = ((const unsigned char *)data)[i];
-		ptr += clen;
-		data = (const unsigned char *)data + clen;
-		len -= clen;
-		if (ptr == 72) {
-			INPUT_BUF(72);
-			KECCAK_F_1600_;
-			ptr = 0;
-		}
+void keccak_core_end_64_8(keccak_context *kc, const void *data)
+{
+	unsigned char *buf;
+
+	buf = kc->buf;
+
+	buf[8] = 1;
+#pragma unroll
+	for (int i = 9; i < 71; i++) buf[i] = 0;
+	buf[71] = 0x80;
+
+#pragma unroll
+	for (size_t j = 0; j < (72); j += 8) {
+		kc->u.wide[j >> 3] ^= (*((ulong*)(buf + j)));
 	}
-	kc->ptr = ptr;
+#pragma unroll
+	for (int j = 0; j < 24; j ++) {
+		KF_ELT01(RC[j + 0]);
+		P1_TO_P0;
+	}
 }
 
 // d = 64, lim = 72, ub = 0. n = 0
 	static void keccak_close(keccak_context *kc, void *dst)
 	{
-		unsigned eb;
 		union {
 			unsigned char tmp[72 + 1];
 			ulong dummy;   /* for alignment */
 		} u;
 		size_t j;
 
-		eb = (0x100 | (0 & 0xFF)) >> (8 - 0);
-		if (kc->ptr == (72 - 1)) {
-			if (0 == 7) {
-				u.tmp[0] = eb;
-				//memset(u.tmp + 1, 0, 72 - 1);
-				for (int ii = 0; ii < (72-1); ii++) {
-					(u.tmp + 1)[ii] = 0;
-				}
-				u.tmp[72] = 0x80;
-				j = 1 + 72;
-			} else {
-				u.tmp[0] = eb | 0x80;
-				j = 1;
-			}
-		} else {
-			j = 72 - kc->ptr;
-			u.tmp[0] = eb;
-			//memset(u.tmp + 1, 0, j - 2);
-			for (int ii = 0; ii < (j - 2); ii++) {
-				(u.tmp + 1)[ii] = 0;
-			}
-			u.tmp[j - 1] = 0x80;
-		}
-		keccak_core(kc, u.tmp, j);
+		keccak_core_end_64_8(kc, u.tmp);
 		/* Finalize the "lane complement" */
 		kc->u.wide[ 1] = ~kc->u.wide[ 1];
 		kc->u.wide[ 2] = ~kc->u.wide[ 2];
@@ -430,11 +421,7 @@ void keccak_core(keccak_context *kc, const void *data, size_t len)
 		kc->u.wide[17] = ~kc->u.wide[17];
 		kc->u.wide[20] = ~kc->u.wide[20];
 		for (j = 0; j < 64; j += 8)
-			enc64le_aligned(u.tmp + j, kc->u.wide[j >> 3]);
-		//memcpy(dst, u.tmp, 64);
-		for (int ii = 0; ii< 64; ii++) {
-			((uchar*)dst)[ii] = u.tmp[ii];
-		}
+			enc64le_aligned(((uchar*)dst) + j, kc->u.wide[j >> 3]);
 	}
 
 kernel void keccak_init_g(global keccak_context* out) {
@@ -452,7 +439,7 @@ kernel void keccak_update_g(global char* in, global keccak_context* out) {
 		data[i] = in[i];
 	}
 	keccak_init(&ctx_keccak);
-	keccak_core(&ctx_keccak, data, 80);
+	keccak_core_80(&ctx_keccak, data);
 
 	(*out) = ctx_keccak;
 }
@@ -467,7 +454,7 @@ kernel void keccak(global char* in, global ulong* out) {
 	}
 
 	keccak_init(&ctx_keccak);
-	keccak_core(&ctx_keccak, data, 80);
+	keccak_core_80(&ctx_keccak, data);
 	keccak_close(&ctx_keccak, hash);
 
 	for (int i = 0; i < 8; i++) {

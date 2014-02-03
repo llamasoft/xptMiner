@@ -84,6 +84,9 @@ xptMiner/%.o: xptMiner/%.cpp
 xptMiner/%.o: xptMiner/%.c
 	$(CC) -c $(OPTFLAGS) $(CFLAGS) $(INCLUDEPATHS) $< -o $@ 
 
+xptMiner/shavite_ref_impl/%.o: xptMiner/shavite_ref_impl/%.c
+	$(CC) -c $(OPTFLAGS) $(CFLAGS) $(INCLUDEPATHS) $< -o $@ 
+
 xptminer$(EXTENSION): $(OBJS:xptMiner/%=xptMiner/%) $(JHLIB:xptMiner/jhlib/%=xptMiner/jhlib/%)
 	$(CXX) $(CFLAGS) $(LIBPATHS) $(INCLUDEPATHS) -o $@ $^ $(LIBS) -flto
 
