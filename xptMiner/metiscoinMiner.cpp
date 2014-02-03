@@ -36,16 +36,24 @@ void metiscoin_init_opencl(int device_num) {
 	files_keccak.push_back("opencl/shavite.cl");
 	files_keccak.push_back("opencl/metis.cl");
 	files_keccak.push_back("opencl/miner.cl");
+	printf("here 1\n");
 	OpenCLProgram* program = main.getDevice(0)->getContext()->loadProgramFromFiles(files_keccak);
+	printf("here 2\n");
 	kernel_all = program->getKernel("metiscoin_process");
+	printf("here 3\n");
 	kernel_keccak_noinit = program->getKernel("keccak_step_noinit");
+	printf("here 4\n");
 	kernel_shavite = program->getKernel("shavite_step");
+	printf("here 5\n");
 	kernel_metis = program->getKernel("metis_step");
+	printf("here 6\n");
 #ifdef VALIDATE_ALGORITHMS
 	kernel_validate = program->getKernel("metis512");
 #endif
 
+	printf("here 7\n");
 	main.listDevices();
+	printf("here 8\n");
 
 	u = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(25*sizeof(cl_ulong), CL_MEM_READ_WRITE, NULL);
 	buff = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(4, CL_MEM_READ_WRITE, NULL);
