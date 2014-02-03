@@ -446,19 +446,15 @@ void xptMiner_printHelp()
 {
 	puts("Usage: xptMiner.exe [options]");
 	puts("General options:");
-	puts("   -o, -O                        The miner will connect to this url");
-	puts("                                 You can specify a port after the url using -o url:port");
-	puts("   -u                            The username (workername) used for login");
-	puts("   -p                            The password used for login");
-	puts("   -t <num>                      The number of threads for mining (default is set to number of cores)");
-	puts("                                 For most efficient mining, set to number of physical CPU cores");
-	puts("Protoshares specific:");
-	puts("   -m<amount>                    Defines how many megabytes of memory are used per thread.");
-	puts("                                 Default is 256mb, allowed constants are:");
-	puts("                                 -m512 -m256 -m128 -m32 -m8");
-	puts("   -d <num>                      Donation amount for dev (default sets miner to donate 1% to dev)");
+	puts("   -o, -O               The miner will connect to this url");
+	puts("                        You can specify a port after the url using -o url:port");
+	puts("   -u                   The username (workername) used for login");
+	puts("   -p                   The password used for login");
+	puts("   -t <num>             The number of threads for mining (default is 1)");
+	puts("   -f <num>             Donation amount for dev (default donates 2.5% to dev)");
+	puts("   -d <num>,<num>,...   List of GPU devices to use (default is 0).");
 	puts("Example usage:");
-	puts("   xptMiner.exe -o http://poolurl.com:10034 -u workername.pts_1 -p workerpass -t 4");
+	puts("  xptminer.exe -o http://ypool.net:10034 -u workername.pts_1 -p pass -d 0");
 }
 
 void xptMiner_parseCommandline(int argc, char **argv)
@@ -648,16 +644,21 @@ sysctl(mib, 2, &numcpu, &len, NULL, 0);
 	xptMiner_parseCommandline(argc, argv);
 	minerSettings.protoshareMemoryMode = commandlineInput.ptsMemoryMode;
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
-	printf("\xBA  xptMiner (v1.1)                                 \xBA\n");
-	printf("\xBA  author: jh00                                    \xBA\n");
-	printf("\xBA  http://ypool.net                                \xBA\n");
+	printf("\xBA  xptMiner (v1.1) + GPU Metiscoin Miner (v0.1)    \xBA\n");
+	printf("\xBA  author: girino (GPU Metiscoin Miner)            \xBA\n");
+	printf("\xBA          jh00   (xptMiner)                       \xBA\n");
+	printf("\xBA                                                  \xBA\n");
+	printf("\xBA  Please donate:                                  \xBA\n");
+	printf("\xBA      MTC: MTq5EaAY9DvVXaByMEjJwVEhQWF1VVh7R8     \xBA\n");
+	printf("\xBA      BTC: 1GiRiNoKznfGbt8bkU1Ley85TgVV7ZTXce     \xBA\n");
+	printf("\xBA                                                  \xBA\n");
 	printf("\xC8\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBC\n");
 	printf("Launching miner...\n");
 	uint32 mbTable[] = {512,256,128,32,8};
 	//printf("Using %d megabytes of memory per thread\n", mbTable[min(commandlineInput.ptsMemoryMode,(sizeof(mbTable)/sizeof(mbTable[0])))]);
 	printf("Using %d threads\n", commandlineInput.numThreads);
 	
-	printf("\nFee Percentage:  %.2f%%. To set, use \"-d\" flag e.g. \"-d 2.5\" is 2.5%% donation\n\n", commandlineInput.donationPercent);
+	printf("\nFee Percentage:  %.2f%%. To set, use \"-f\" flag e.g. \"-f 2.5\" is 2.5%% donation\n\n", commandlineInput.donationPercent);
 #ifdef _WIN32
 	// set priority to below normal
 	SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
@@ -694,6 +695,9 @@ sysctl(mib, 2, &numcpu, &len, NULL, 0);
 	// inits GPU
 	printf("Available devices:\n");
 	OpenCLMain::getInstance().listDevices();
+	if (commandlineInput.listDevices) {
+		exit(0);
+	}
 	if (commandlineInput.deviceList.empty()) {
 		for (int i = 0; i < commandlineInput.numThreads; i++) {
 			commandlineInput.deviceList.push_back(i);
