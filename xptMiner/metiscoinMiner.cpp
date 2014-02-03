@@ -2,6 +2,9 @@
 #include "OpenCLObjects.h"
 #include "ticker.h"
 
+#define STEP_SIZE 0x80000;
+#define NUM_STEPS (0x8000000/STEP_SIZE);
+
 OpenCLKernel* kernel_all;
 OpenCLKernel* kernel_keccak_noinit;
 OpenCLKernel* kernel_shavite;
@@ -50,7 +53,8 @@ void metiscoin_init_opencl(int device_num) {
 	u = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(25*sizeof(cl_ulong), CL_MEM_READ_WRITE, NULL);
 	buff = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(4, CL_MEM_READ_WRITE, NULL);
 
-	hashes = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(64*0x8000, CL_MEM_READ_WRITE, NULL);
+	hashes = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(
+			64 * STEP_SIZE, CL_MEM_READ_WRITE, NULL);
 	out = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(sizeof(cl_uint) * 255, CL_MEM_READ_WRITE, NULL);
 	out_count = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(sizeof(cl_uint), CL_MEM_READ_WRITE, NULL);
 	q = OpenCLMain::getInstance().getDevice(0)->getContext()->createCommandQueue(OpenCLMain::getInstance().getDevice(0));
@@ -69,7 +73,7 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 	uint32 target = *(uint32*)(block->targetShare+28);
 
 	// measure time
-	for(uint32 n=0; n<0x1000; n++)
+	for (uint32 n = 0; n < NUM_STEPS; n++)
 	{
 #ifdef MEASURE_TIME
 		uint32 begin = getTimeMilliseconds();
@@ -83,7 +87,7 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 		kernel_keccak_noinit->addGlobalArg(u);
 		kernel_keccak_noinit->addGlobalArg(buff);
 		kernel_keccak_noinit->addGlobalArg(hashes);
-		kernel_keccak_noinit->addScalarUInt(n*0x8000);
+		kernel_keccak_noinit->addScalarUInt(n * STEP_SIZE);
 
 		sph_keccak512_context	 ctx_keccak;
 		sph_keccak512_init(&ctx_keccak);
@@ -91,7 +95,9 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 
 		q->enqueueWriteBuffer(u, ctx_keccak.u.wide, 25*sizeof(cl_ulong));
 		q->enqueueWriteBuffer(buff, ctx_keccak.buf, 4);
-		q->enqueueKernel1D(kernel_keccak_noinit, 0x8000, kernel_keccak_noinit->getWorkGroupSize(OpenCLMain::getInstance().getDevice(0)));
+		q->enqueueKernel1D(kernel_keccak_noinit, STEP_SIZE,
+				kernel_keccak_noinit->getWorkGroupSize(
+						OpenCLMain::getInstance().getDevice(0)));
 
 #ifdef MEASURE_TIME
 		q->finish();
@@ -102,7 +108,9 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 		kernel_shavite->resetArgs();
 		kernel_shavite->addGlobalArg(hashes);
 
-		q->enqueueKernel1D(kernel_shavite, 0x8000, kernel_shavite->getWorkGroupSize(OpenCLMain::getInstance().getDevice(0)));
+		q->enqueueKernel1D(kernel_shavite, STEP_SIZE,
+				kernel_shavite->getWorkGroupSize(
+						OpenCLMain::getInstance().getDevice(0)));
 
 #ifdef MEASURE_TIME
 		q->finish();
@@ -119,7 +127,9 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 
 		cl_uint out_count_tmp = 0;
 		q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
-		q->enqueueKernel1D(kernel_metis, 0x8000, kernel_metis->getWorkGroupSize(OpenCLMain::getInstance().getDevice(0)));
+		q->enqueueKernel1D(kernel_metis, STEP_SIZE,
+				kernel_metis->getWorkGroupSize(
+						OpenCLMain::getInstance().getDevice(0)));
 		q->enqueueReadBuffer(out, out_tmp, sizeof(cl_uint) * 255);
 		q->enqueueReadBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 		q->finish();
@@ -129,7 +139,7 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 			xptMiner_submitShare(block);
 		}
 
-		totalCollisionCount += 0x8000;
+		totalCollisionCount += STEP_SIZE;
 #ifdef MEASURE_TIME
 		uint32 end = getTimeMilliseconds();
 		printf("Elapsed time: %d (k = %d, s = %d, m = %d) ms\n", (end-begin), (end_keccak-begin), (end_shavite-end_keccak), (end-end_shavite));
@@ -138,13 +148,14 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 #ifdef VALIDATE_ALGORITHMS
 		uint32 begin_validation = getTimeMilliseconds();
 
-		cl_ulong *tmp_hashes = new cl_ulong[8*0x8000];
-		q->enqueueReadBuffer(hashes, tmp_hashes, sizeof(cl_ulong)*8*0x8000);
+		cl_ulong *tmp_hashes = new cl_ulong[8 * STEP_SIZE];
+		q->enqueueReadBuffer(hashes, tmp_hashes,
+				sizeof(cl_ulong) * 8 * STEP_SIZE);
 		q->finish();
 
 		// validator
-		block->nonce = n * 0x8000;
-		for (int f = 0; f < 0x8000; f++) {
+		block->nonce = n * STEP_SIZE;
+		for (int f = 0; f < STEP_SIZE; f++) {
 			sph_keccak512_context	 ctx_keccak;
 			sph_shavite512_context	 ctx_shavite;
 			sph_metis512_context	 ctx_metis;
