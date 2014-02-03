@@ -1,5 +1,7 @@
 #include "global.h"
 #include "ticker.h"
+#include "OpenCLObjects.h"
+#include "metiscoinMiner.h"
 #include <signal.h>
 #include <stdio.h>
 #include <cstring>
@@ -40,6 +42,8 @@ struct
 
 uint32 uniqueMerkleSeedGenerator = 0;
 uint32 miningStartTime = 0;
+
+std::vector<MetiscoinOpenCL *> gpu_processors;
 
 /*
  * Submit Protoshares share
@@ -189,6 +193,9 @@ void *xptMiner_minerThread(void *arg)
 	minerScryptBlock_t minerScryptBlock = {0};
 	minerMetiscoinBlock_t minerMetiscoinBlock = {0};
 	minerPrimecoinBlock_t minerPrimecoinBlock = {0}; 
+	MetiscoinOpenCL *processor = gpu_processors.back();
+	gpu_processors.pop_back();
+
 	// todo: Eventually move all block structures into a union to save stack size
 	while( true )
 	{
@@ -197,43 +204,7 @@ void *xptMiner_minerThread(void *arg)
 		EnterCriticalSection(&workDataSource.cs_work);
 		if( workDataSource.height > 0 )
 		{
-			if( workDataSource.algorithm == ALGORITHM_PROTOSHARES )
-			{
-				// get protoshares work data
-				minerProtosharesBlock.version = workDataSource.version;
-				minerProtosharesBlock.nTime = (uint32)time(NULL) + workDataSource.timeBias;
-				minerProtosharesBlock.nBits = workDataSource.nBits;
-				minerProtosharesBlock.nonce = 0;
-				minerProtosharesBlock.height = workDataSource.height;
-				memcpy(minerProtosharesBlock.merkleRootOriginal, workDataSource.merkleRootOriginal, 32);
-				memcpy(minerProtosharesBlock.prevBlockHash, workDataSource.prevBlockHash, 32);
-				memcpy(minerProtosharesBlock.targetShare, workDataSource.targetShare, 32);
-				minerProtosharesBlock.uniqueMerkleSeed = uniqueMerkleSeedGenerator;
-				uniqueMerkleSeedGenerator++;
-				// generate merkle root transaction
-				bitclient_generateTxHash(sizeof(uint32), (uint8*)&minerProtosharesBlock.uniqueMerkleSeed, workDataSource.coinBase1Size, workDataSource.coinBase1, workDataSource.coinBase2Size, workDataSource.coinBase2, workDataSource.txHash);
-				bitclient_calculateMerkleRoot(workDataSource.txHash, workDataSource.txHashCount+1, minerProtosharesBlock.merkleRoot);
-				hasValidWork = true;
-			}
-			else if( workDataSource.algorithm == ALGORITHM_SCRYPT )
-			{
-				// get scrypt work data
-				minerScryptBlock.version = workDataSource.version;
-				minerScryptBlock.nTime = (uint32)time(NULL) + workDataSource.timeBias;
-				minerScryptBlock.nBits = workDataSource.nBits;
-				minerScryptBlock.nonce = 0;
-				minerScryptBlock.height = workDataSource.height;
-				memcpy(minerScryptBlock.merkleRootOriginal, workDataSource.merkleRootOriginal, 32);
-				memcpy(minerScryptBlock.prevBlockHash, workDataSource.prevBlockHash, 32);
-				memcpy(minerScryptBlock.targetShare, workDataSource.targetShare, 32);
-				minerScryptBlock.uniqueMerkleSeed = uniqueMerkleSeedGenerator;
-				uniqueMerkleSeedGenerator++;
-				// generate merkle root transaction
-				bitclient_generateTxHash(sizeof(uint32), (uint8*)&minerScryptBlock.uniqueMerkleSeed, workDataSource.coinBase1Size, workDataSource.coinBase1, workDataSource.coinBase2Size, workDataSource.coinBase2, workDataSource.txHash);
-				bitclient_calculateMerkleRoot(workDataSource.txHash, workDataSource.txHashCount+1, minerScryptBlock.merkleRoot);
-				hasValidWork = true;
-			}
-			else if( workDataSource.algorithm == ALGORITHM_METISCOIN )
+			if( workDataSource.algorithm == ALGORITHM_METISCOIN )
 			{
 				// get metiscoin work data
 				minerMetiscoinBlock.version = workDataSource.version;
@@ -251,24 +222,6 @@ void *xptMiner_minerThread(void *arg)
 				bitclient_calculateMerkleRoot(workDataSource.txHash, workDataSource.txHashCount+1, minerMetiscoinBlock.merkleRoot);
 				hasValidWork = true;
 			}
-			else if( workDataSource.algorithm == ALGORITHM_PRIME )
-			{
-				// get primecoin work data
-				minerPrimecoinBlock.version = workDataSource.version;
-				minerPrimecoinBlock.nTime = (uint32)time(NULL) + workDataSource.timeBias;
-				minerPrimecoinBlock.nBits = workDataSource.nBits;
-				minerPrimecoinBlock.nonce = 0;
-				minerPrimecoinBlock.height = workDataSource.height;
-				memcpy(minerPrimecoinBlock.merkleRootOriginal, workDataSource.merkleRootOriginal, 32);
-				memcpy(minerPrimecoinBlock.prevBlockHash, workDataSource.prevBlockHash, 32);
-				memcpy(minerPrimecoinBlock.targetShare, workDataSource.targetShare, 32);
-				minerPrimecoinBlock.uniqueMerkleSeed = uniqueMerkleSeedGenerator;
-				uniqueMerkleSeedGenerator++;
-				// generate merkle root transaction
-				bitclient_generateTxHash(sizeof(uint32), (uint8*)&minerPrimecoinBlock.uniqueMerkleSeed, workDataSource.coinBase1Size, workDataSource.coinBase1, workDataSource.coinBase2Size, workDataSource.coinBase2, workDataSource.txHash);
-				bitclient_calculateMerkleRoot(workDataSource.txHash, workDataSource.txHashCount+1, minerPrimecoinBlock.merkleRoot);
-				hasValidWork = true;
-			}
 		}
       LeaveCriticalSection(&workDataSource.cs_work);
 		if( hasValidWork == false )
@@ -279,7 +232,7 @@ void *xptMiner_minerThread(void *arg)
 		// valid work data present, start processing workload
 		if( workDataSource.algorithm == ALGORITHM_METISCOIN )
 		{
-			metiscoin_process(&minerMetiscoinBlock);
+			processor->metiscoin_process(&minerMetiscoinBlock);
 		}
 		else
 		{
@@ -287,6 +240,7 @@ void *xptMiner_minerThread(void *arg)
 			Sleep(5000); // dont spam the console
 		}
 	}
+	delete processor;
 	return 0;
 }
 
@@ -476,6 +430,9 @@ typedef struct
 	sint32 numThreads;
 	uint32 ptsMemoryMode;
 	// GPU / OpenCL options
+	uint32 deviceNum;
+	bool listDevices;
+	std::vector<int> deviceList;
 
 	// mode option
 	uint32 mode;
@@ -483,6 +440,7 @@ typedef struct
 }commandlineInput_t;
 
 commandlineInput_t commandlineInput;
+
 
 void xptMiner_printHelp()
 {
@@ -589,7 +547,7 @@ void xptMiner_parseCommandline(int argc, char **argv)
 		{
 			commandlineInput.ptsMemoryMode = PROTOSHARE_MEM_8;
 		}
-		else if( memcmp(argument, "-d", 3)==0 )
+		else if( memcmp(argument, "-f", 3)==0 )
 		{
 			if( cIdx >= argc )
 			{
@@ -602,6 +560,29 @@ void xptMiner_parseCommandline(int argc, char **argv)
 				printf("-d parameter out of range. Valid values are integers from 1 to 100.");
 				exit(0);
 			}
+			cIdx++;
+		}
+		else if( memcmp(argument, "-list-devices", 14)==0 )
+		{
+			commandlineInput.listDevices = true;
+		}
+		else if( memcmp(argument, "-device", 8)==0 || memcmp(argument, "-d", 3)==0 || memcmp(argument, "-devices", 9)==0)
+		{
+			// -d
+			if( cIdx >= argc )
+			{
+				printf("Missing device list after %s option\n", argument);
+				exit(0);
+			}
+			std::string list = std::string(argv[cIdx]);
+			std::string delimiter = ",";
+			size_t pos = 0;
+			while ((pos = list.find(delimiter)) != std::string::npos) {
+				std::string token = list.substr(0, pos);
+				commandlineInput.deviceList.push_back(atoi(token.c_str()));
+			    list.erase(0, pos + delimiter.length());
+			}
+			commandlineInput.deviceList.push_back(atoi(list.c_str()));
 			cIdx++;
 		}
 		else if( memcmp(argument, "-help", 6)==0 || memcmp(argument, "--help", 7)==0 )
@@ -711,7 +692,25 @@ sysctl(mib, 2, &numcpu, &len, NULL, 0);
 	minerSettings.requestTarget.donationPercent = commandlineInput.donationPercent;
 
 	// inits GPU
-	metiscoin_init_opencl(0);
+	printf("Available devices:\n");
+	OpenCLMain::getInstance().listDevices();
+	if (commandlineInput.deviceList.empty()) {
+		for (int i = 0; i < commandlineInput.numThreads; i++) {
+			commandlineInput.deviceList.push_back(i);
+		}
+	} else {
+		commandlineInput.numThreads = commandlineInput.deviceList.size();
+	}
+	printf("Adjusting num threads to match device list: %d\n", commandlineInput.numThreads);
+
+	// inits all GPU devices
+	printf("Initializing GPU...\n");
+	for (int i = 0; i < commandlineInput.deviceList.size(); i++) {
+		printf("Initing device %d.\n", i);
+		gpu_processors.push_back(new MetiscoinOpenCL(commandlineInput.deviceList[i]));
+		printf("Device %d Inited.\n", i);
+	}
+	printf("All GPUs Initialized...\n");
 
 	// start miner threads
 #ifndef _WIN32

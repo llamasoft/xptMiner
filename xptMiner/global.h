@@ -1,3 +1,6 @@
+#ifndef __GLOBAL_H__
+#define __GLOBAL_H__
+
 #include <algorithm>
 #include <string.h>
 #include <cstring>
@@ -194,3 +197,5 @@ extern volatile uint32 totalCollisionCount;
 extern volatile uint32 totalShareCount;
 
 extern volatile uint32 monitorCurrentBlockHeight;
+
+#endif

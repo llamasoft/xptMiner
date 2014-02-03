@@ -1,37 +1,26 @@
 #include"global.h"
 #include "OpenCLObjects.h"
 #include "ticker.h"
+#include "metiscoinMiner.h"
 
 #define STEP_SIZE 0x80000
 #define NUM_STEPS (0x8000000/STEP_SIZE)
 
-OpenCLKernel* kernel_all;
-OpenCLKernel* kernel_keccak_noinit;
-OpenCLKernel* kernel_shavite;
-OpenCLKernel* kernel_metis;
-#ifdef VALIDATE_ALGORITHMS
-OpenCLKernel* kernel_validate;
-#endif
-OpenCLBuffer* u;
-OpenCLBuffer* buff;
-OpenCLBuffer* hashes;
-OpenCLBuffer* out;
-OpenCLBuffer* out_count;
-OpenCLCommandQueue * q;
-uint32_t *out_tmp = new uint32_t[255];
-
-void metiscoin_init_opencl(int device_num) {
+MetiscoinOpenCL::MetiscoinOpenCL(int _device_num) {
+	this->device_num = _device_num;
 	printf("Initializing GPU %d\n", device_num);
 	OpenCLMain &main = OpenCLMain::getInstance();
+	OpenCLDevice* device = main.getDevice(device_num);
+	printf("Initializing Device: %s\n", device->getName().c_str());
 
 //	std::vector<std::string> files_metis;
 //	files_metis.push_back("opencl/metis.cl");
-//	OpenCLProgram* program_metis = main.getDevice(0)->getContext()->loadProgramFromFiles(files_metis);
+//	OpenCLProgram* program_metis = main.getDevice(device_num)->getContext()->loadProgramFromFiles(files_metis);
 //	OpenCLKernel* kernel_metis = program_metis->getKernel("metis512");
 //
 //	std::vector<std::string> files_shavite;
 //	files_shavite.push_back("opencl/shavite.cl");
-//	OpenCLProgram* program_shavite = main.getDevice(0)->getContext()->loadProgramFromFiles(files_shavite);
+//	OpenCLProgram* program_shavite = main.getDevice(device_num)->getContext()->loadProgramFromFiles(files_shavite);
 //	OpenCLKernel* kernel_shavite = program_shavite->getKernel("shavite512");
 
 	std::vector<std::string> files_keccak;
@@ -39,7 +28,7 @@ void metiscoin_init_opencl(int device_num) {
 	files_keccak.push_back("opencl/shavite.cl");
 	files_keccak.push_back("opencl/metis.cl");
 	files_keccak.push_back("opencl/miner.cl");
-	OpenCLProgram* program = main.getDevice(0)->getContext()->loadProgramFromFiles(files_keccak);
+	OpenCLProgram* program = device->getContext()->loadProgramFromFiles(files_keccak);
 	kernel_all = program->getKernel("metiscoin_process");
 	kernel_keccak_noinit = program->getKernel("keccak_step_noinit");
 	kernel_shavite = program->getKernel("shavite_step");
@@ -50,14 +39,14 @@ void metiscoin_init_opencl(int device_num) {
 
 	main.listDevices();
 
-	u = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(25*sizeof(cl_ulong), CL_MEM_READ_WRITE, NULL);
-	buff = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(4, CL_MEM_READ_WRITE, NULL);
+	u = device->getContext()->createBuffer(25*sizeof(cl_ulong), CL_MEM_READ_WRITE, NULL);
+	buff = device->getContext()->createBuffer(4, CL_MEM_READ_WRITE, NULL);
 
-	hashes = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(
+	hashes = device->getContext()->createBuffer(
 			64 * STEP_SIZE, CL_MEM_READ_WRITE, NULL);
-	out = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(sizeof(cl_uint) * 255, CL_MEM_READ_WRITE, NULL);
-	out_count = OpenCLMain::getInstance().getDevice(0)->getContext()->createBuffer(sizeof(cl_uint), CL_MEM_READ_WRITE, NULL);
-	q = OpenCLMain::getInstance().getDevice(0)->getContext()->createCommandQueue(OpenCLMain::getInstance().getDevice(0));
+	out = device->getContext()->createBuffer(sizeof(cl_uint) * 255, CL_MEM_READ_WRITE, NULL);
+	out_count = device->getContext()->createBuffer(sizeof(cl_uint), CL_MEM_READ_WRITE, NULL);
+	q = device->getContext()->createCommandQueue(device);
 }
 
 static inline cl_uint my_swap32(cl_uint x)
@@ -66,11 +55,14 @@ static inline cl_uint my_swap32(cl_uint x)
 	  (((x)&0xFF0000)>> 8) | (((x)&0xFF000000)>>24));
 }
 
-void metiscoin_process(minerMetiscoinBlock_t* block)
+void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 {
 
 	block->nonce = 0;
 	uint32 target = *(uint32*)(block->targetShare+28);
+	OpenCLDevice* device = OpenCLMain::getInstance().getDevice(device_num);
+	//printf("processing block with Device: %s\n", device->getName().c_str());
+
 
 	// measure time
 	for (uint32 n = 0; n < NUM_STEPS; n++)
@@ -96,12 +88,10 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 		q->enqueueWriteBuffer(u, ctx_keccak.u.wide, 25*sizeof(cl_ulong));
 		q->enqueueWriteBuffer(buff, ctx_keccak.buf, 4);
 		q->enqueueKernel1D(kernel_keccak_noinit, STEP_SIZE,
-				kernel_keccak_noinit->getWorkGroupSize(
-						OpenCLMain::getInstance().getDevice(0)));
+				kernel_keccak_noinit->getWorkGroupSize(device));
 
 #ifdef MEASURE_TIME
-		printf("keccak work group size = %d\n", kernel_keccak_noinit->getWorkGroupSize(
-						OpenCLMain::getInstance().getDevice(0)));
+		printf("keccak work group size = %d\n", kernel_keccak_noinit->getWorkGroupSize(device));
 		q->finish();
 		uint32 end_keccak = getTimeMilliseconds();
 #endif
@@ -111,12 +101,10 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 		kernel_shavite->addGlobalArg(hashes);
 
 		q->enqueueKernel1D(kernel_shavite, STEP_SIZE,
-				kernel_shavite->getWorkGroupSize(
-						OpenCLMain::getInstance().getDevice(0)));
+				kernel_shavite->getWorkGroupSize(device));
 
 #ifdef MEASURE_TIME
-		printf("shavite work group size = %d\n", kernel_shavite->getWorkGroupSize(
-						OpenCLMain::getInstance().getDevice(0)));
+		printf("shavite work group size = %d\n", kernel_shavite->getWorkGroupSize(device));
 		q->finish();
 		uint32 end_shavite = getTimeMilliseconds();
 #endif
@@ -132,8 +120,7 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 		cl_uint out_count_tmp = 0;
 		q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 		q->enqueueKernel1D(kernel_metis, STEP_SIZE,
-				kernel_metis->getWorkGroupSize(
-						OpenCLMain::getInstance().getDevice(0)));
+				kernel_metis->getWorkGroupSize(device));
 		q->enqueueReadBuffer(out, out_tmp, sizeof(cl_uint) * 255);
 		q->enqueueReadBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 		q->finish();
