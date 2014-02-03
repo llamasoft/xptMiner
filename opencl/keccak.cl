@@ -54,20 +54,21 @@ constant ulong RC[] = {
 #define a34   (kc->u.wide[23])
 #define a44   (kc->u.wide[24])
 
-//ulong
-//dec64le_aligned(const void *src)
-//{
-//	return (ulong)(((const unsigned char *)src)[0])
-//		| ((ulong)(((const unsigned char *)src)[1]) << 8)
-//		| ((ulong)(((const unsigned char *)src)[2]) << 16)
-//		| ((ulong)(((const unsigned char *)src)[3]) << 24)
-//		| ((ulong)(((const unsigned char *)src)[4]) << 32)
-//		| ((ulong)(((const unsigned char *)src)[5]) << 40)
-//		| ((ulong)(((const unsigned char *)src)[6]) << 48)
-//		| ((ulong)(((const unsigned char *)src)[7]) << 56);
-//}
+ulong
+dec64le_aligned(const void *src)
+{
+	return (ulong)(((const unsigned char *)src)[0])
+		| ((ulong)(((const unsigned char *)src)[1]) << 8)
+		| ((ulong)(((const unsigned char *)src)[2]) << 16)
+		| ((ulong)(((const unsigned char *)src)[3]) << 24)
+		| ((ulong)(((const unsigned char *)src)[4]) << 32)
+		| ((ulong)(((const unsigned char *)src)[5]) << 40)
+		| ((ulong)(((const unsigned char *)src)[6]) << 48)
+		| ((ulong)(((const unsigned char *)src)[7]) << 56);
+}
 
-#define dec64le_aligned(x) (*((ulong*)(x)))
+// this does not work on AMD for some reason, reverting
+//#define dec64le_aligned(x) (*((ulong*)(x)))
 
 //void
 //enc64le_aligned(void *dst, ulong val) {
