@@ -150,14 +150,14 @@ kernel void metis_step(global ulong* in, global uint* out, global uint* outcount
 	metis_core_64(&ctx_metis, hash0);
 	metis_close(&ctx_metis, hash1);
 
-//	// for debug
+	// for debug
 //	for (int i = 0; i < 8; i++) {
 //		in[(id * 8)+i] = hash1[i];
 //	}
 
 	if( *(uint*)((uchar*)hash1+28) <= target )
 	{
-		uint pos = atomic_inc(out) + 1; //saves first pos for counter
+		uint pos = atomic_inc(outcount); //saves first pos for counter
 		out[pos] = nonce;
 	}
 
