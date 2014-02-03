@@ -145,8 +145,6 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 
 		totalCollisionCount += STEP_SIZE;
 #ifdef MEASURE_TIME
-		printf("metis work group size = %d\n", kernel_metis->getWorkGroupSize(
-						OpenCLMain::getInstance().getDevice(0)));
 		uint32 end = getTimeMilliseconds();
 		printf("Elapsed time: %d (k = %d, s = %d, m = %d) ms\n", (end-begin), (end_keccak-begin), (end_shavite-end_keccak), (end-end_shavite));
 #endif
