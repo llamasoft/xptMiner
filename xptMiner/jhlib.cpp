@@ -596,7 +596,8 @@ uint32 streamEx_substream_readData(void *object, void *buffer, uint32 len)
 
 uint32 streamEx_substream_writeData(void *object, void *buffer, uint32 len)
 {	
-	__debugbreak(); 
+	__debugbreak();
+	return 0;
 }
 
 uint32 streamEx_substream_getSize(void *object)
