@@ -126,6 +126,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		q->finish();
 
 		for (int i = 0; i < out_count_tmp; i++) {
+			totalShareCount++;
 			block->nonce = out_tmp[i];
 			xptMiner_submitShare(block);
 		}
@@ -144,6 +145,21 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 				sizeof(cl_ulong) * 8 * STEP_SIZE);
 		q->finish();
 
+		int aaa = 0;
+		for (int i = 0; i < STEP_SIZE; i++) {
+			cl_ulong * hhh = tmp_hashes+(i*8);
+			if( *(cl_uint*)((cl_uchar*)hhh+28) <= target )
+			{
+				aaa++;
+			}
+		}
+
+		if (aaa != out_count_tmp) {
+			printf ("************* ERRO ****************\n");
+			exit(0);
+		}
+
+
 		// validator
 		block->nonce = n * STEP_SIZE;
 		for (int f = 0; f < STEP_SIZE; f++) {
@@ -160,26 +176,16 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 			sph_shavite512_init(&ctx_shavite);
 			sph_metis512_init(&ctx_metis);
 			sph_keccak512(&ctx_keccak, &block->version, 80);
-
-//			// printf contents of ctx
-//			printf ("lim = %d\n",ctx_keccak.lim);
-//			printf ("ptr = %d\n",ctx_keccak.ptr);
-//			for (int i = 0; i < ctx_keccak.ptr; i++) {
-//				printf ("buff[%d] = %X\n",i,ctx_keccak.buf[i]);
-//			}
-//			printf ("nonce = %X\n", block->nonce);
-//			for (int i = 0; i < 25; i++) {
-//				printf ("u[%d] = %lX\n",i,ctx_keccak.u.wide[i]);
-//			}
-
 			sph_keccak512_close(&ctx_keccak, hash0);
 			sph_shavite512(&ctx_shavite, hash0, 64);
 			sph_shavite512_close(&ctx_shavite, hash1);
+			sph_metis512(&ctx_metis, hash1, 64);
+			sph_metis512_close(&ctx_metis, hash2);
 
 			hash2_2 = tmp_hashes+(f*8);
 
 			for (int i = 0; i < 8; i++) {
-				if (hash1[i] != hash2_2[i]) {
+				if (hash2[i] != hash2_2[i]) {
 					printf ("**** Hashes do not match %i %x %x\n", i, hash0[i], hash2_2[i]);
 				}
 			}
