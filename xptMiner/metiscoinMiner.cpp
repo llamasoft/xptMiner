@@ -33,9 +33,9 @@ void metiscoin_init_opencl(int device_num) {
 
 	std::vector<std::string> files_keccak;
 	files_keccak.push_back("opencl/keccak.cl");
-	files_keccak.push_back("opencl/shavite.cl");
-	files_keccak.push_back("opencl/metis.cl");
-	files_keccak.push_back("opencl/miner.cl");
+//	files_keccak.push_back("opencl/shavite.cl");
+//	files_keccak.push_back("opencl/metis.cl");
+//	files_keccak.push_back("opencl/miner.cl");
 	printf("here 1\n");
 	OpenCLProgram* program = main.getDevice(0)->getContext()->loadProgramFromFiles(files_keccak);
 	printf("here 2\n");
