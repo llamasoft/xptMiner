@@ -277,40 +277,7 @@ void *xptMiner_minerThread(void *arg)
 			continue;
 		}
 		// valid work data present, start processing workload
-		if(	workDataSource.algorithm == ALGORITHM_PROTOSHARES )
-		{
-			switch( minerSettings.protoshareMemoryMode )
-			{
-			case PROTOSHARE_MEM_512:
-				protoshares_process_512(&minerProtosharesBlock);
-				break;
-			case PROTOSHARE_MEM_256:
-				protoshares_process_256(&minerProtosharesBlock);
-				break;
-			case PROTOSHARE_MEM_128:
-				protoshares_process_128(&minerProtosharesBlock);
-				break;
-			case PROTOSHARE_MEM_32:
-				protoshares_process_32(&minerProtosharesBlock);
-				break;
-			case PROTOSHARE_MEM_8:
-				protoshares_process_8(&minerProtosharesBlock);
-				break;
-			default:
-				printf("Unknown memory mode\n");
-				Sleep(5000);
-				break;
-			}
-		}
-		else if( workDataSource.algorithm == ALGORITHM_SCRYPT )
-		{
-			scrypt_process_cpu(&minerScryptBlock);
-		}
-		else if( workDataSource.algorithm == ALGORITHM_PRIME )
-		{
-			primecoin_process(&minerPrimecoinBlock);
-		}
-		else if( workDataSource.algorithm == ALGORITHM_METISCOIN )
+		if( workDataSource.algorithm == ALGORITHM_METISCOIN )
 		{
 			metiscoin_process(&minerMetiscoinBlock);
 		}
@@ -375,8 +342,7 @@ xptClient_t* xptMiner_initateNewXptConnectionObject()
 	// up to 8 fee entries can be set
 	// the fee base is always calculated from 100% of the share value
 	// for example if you setup two fee entries with 3% and 2%, the total subtracted share value will be 5%
-//	xptClient_addDeveloperFeeEntry(xptClient, "MK6n2VZZBpQrqpP9rtzsC9PRi5t1qsWuGc", getFeeFromDouble(1.0f)); // 0.5% fee (jh00, for testing)
-//	xptClient_addDeveloperFeeEntry(xptClient, "MS94kdFesRQL24EbGwphsoFiVTb3B2JWZG", getFeeFromDouble(1.0f));
+	//xptClient_addDeveloperFeeEntry(xptClient, "MTq5EaAY9DvVXaByMEjJwVEhQWF1VVh7R8", getFeeFromDouble(2.5f));
 	return xptClient;
 }
 
@@ -388,7 +354,7 @@ void xptMiner_xptQueryWorkLoop()
 	{
 		//todo: Set developer fee addr
 		//xptClient_addDeveloperFeeEntry(xptClient, "MK6n2VZZBpQrqpP9rtzsC9PRi5t1qsWuGc", getFeeFromDouble(minerSettings.requestTarget.donationPercent / 2.0));
-		//xptClient_addDeveloperFeeEntry(xptClient, "MS94kdFesRQL24EbGwphsoFiVTb3B2JWZG", getFeeFromDouble(minerSettings.requestTarget.donationPercent / 2.0));
+		xptClient_addDeveloperFeeEntry(xptClient, "MTq5EaAY9DvVXaByMEjJwVEhQWF1VVh7R8", getFeeFromDouble(minerSettings.requestTarget.donationPercent));
 	}
 	uint32 timerPrintDetails = getTimeMilliseconds() + 8000;
 	while( true )
@@ -455,7 +421,7 @@ void xptMiner_xptQueryWorkLoop()
 			else
 			{
 				// is known algorithm?
-				if( xptClient->clientState == XPT_CLIENT_STATE_LOGGED_IN && (xptClient->algorithm != ALGORITHM_PROTOSHARES && xptClient->algorithm != ALGORITHM_SCRYPT && xptClient->algorithm != ALGORITHM_METISCOIN) )
+				if( xptClient->clientState == XPT_CLIENT_STATE_LOGGED_IN && (xptClient->algorithm != ALGORITHM_METISCOIN) )
 				{
 					printf("The login is configured for an unsupported algorithm.\n");
 					printf("Make sure you miner login details are correct\n");
@@ -540,7 +506,7 @@ void xptMiner_printHelp()
 void xptMiner_parseCommandline(int argc, char **argv)
 {
 	sint32 cIdx = 1;
-	commandlineInput.donationPercent = 1.0f;
+	commandlineInput.donationPercent = 2.5f;
 	while( cIdx < argc )
 	{
 		char* argument = argv[cIdx];
