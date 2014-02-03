@@ -31,7 +31,7 @@ shavite_init(shavite_context *sc)
 #define AES2      AES2_LE
 #define AES3      AES3_LE
 
-#define AES_ROUND_LE(X0, X1, X2, X3, K0, K1, K2, K3, Y0, Y1, Y2, Y3)   do { \
+#define AES_ROUND_LE(X0, X1, X2, X3, K0, K1, K2, K3, Y0, Y1, Y2, Y3)   { \
 		(Y0) = AES0[(X0) & 0xFF] \
 			^ AES1[((X1) >> 8) & 0xFF] \
 			^ AES2[((X2) >> 16) & 0xFF] \
@@ -48,20 +48,20 @@ shavite_init(shavite_context *sc)
 			^ AES1[((X0) >> 8) & 0xFF] \
 			^ AES2[((X1) >> 16) & 0xFF] \
 			^ AES3[((X2) >> 24) & 0xFF] ^ (K3); \
-	} while (0)
+	}
 
 #define AES_ROUND_NOKEY_LE(X0, X1, X2, X3, Y0, Y1, Y2, Y3) \
 	AES_ROUND_LE(X0, X1, X2, X3, 0, 0, 0, 0, Y0, Y1, Y2, Y3)
 
-#define AES_ROUND_NOKEY(x0, x1, x2, x3)   do { \
+#define AES_ROUND_NOKEY(x0, x1, x2, x3)   { \
 		uint t0 = (x0); \
 		uint t1 = (x1); \
 		uint t2 = (x2); \
 		uint t3 = (x3); \
 		AES_ROUND_NOKEY_LE(t0, t1, t2, t3, x0, x1, x2, x3); \
-	} while (0)
+	}
 
-#define KEY_EXPAND_ELT(k0, k1, k2, k3)   do { \
+#define KEY_EXPAND_ELT(k0, k1, k2, k3)   { \
 		uint kt; \
 		AES_ROUND_NOKEY(k1, k2, k3, k0); \
 		kt = (k0); \
@@ -69,7 +69,7 @@ shavite_init(shavite_context *sc)
 		(k1) = (k2); \
 		(k2) = (k3); \
 		(k3) = kt; \
-	} while (0)
+	}
 
 
 /*

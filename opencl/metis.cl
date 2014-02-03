@@ -391,25 +391,25 @@ void metis_init(metis_context* sc) {
 	sc->bit_count = 0;
 }
 
-#define TIX4(q, x00, x01, x04, x07, x08, x22, x24, x27, x30)   do { \
+#define TIX4(q, x00, x01, x04, x07, x08, x22, x24, x27, x30)   { \
 		x22 ^= x00; \
 		x00 = (q); \
 		x08 ^= x00; \
 		x01 ^= x24; \
 		x04 ^= x27; \
 		x07 ^= x30; \
-	} while (0)
+	}
 
-#define CMIX36(x00, x01, x02, x04, x05, x06, x18, x19, x20)   do { \
+#define CMIX36(x00, x01, x02, x04, x05, x06, x18, x19, x20)   { \
 		x00 ^= x04; \
 		x01 ^= x05; \
 		x02 ^= x06; \
 		x18 ^= x04; \
 		x19 ^= x05; \
 		x20 ^= x06; \
-	} while (0)
+	}
 
-#define SMIX(x0, x1, x2, x3)   do { \
+#define SMIX(x0, x1, x2, x3)   { \
 		uint c0 = 0; \
 		uint c1 = 0; \
 		uint c2 = 0; \
@@ -480,7 +480,7 @@ void metis_init(metis_context* sc) {
 			| ((c1 ^ (r2 >> 8)) & (0x0000FF00)) \
 			| ((c2 ^ (r3 >> 8)) & (0x000000FF)); \
 		/* */ \
-	} while (0)
+	}
 
 #define my_dec32be(src) 	(((uint)(((const unsigned char *)src)[0]) << 24) \
 							| ((uint)(((const unsigned char *)src)[1]) << 16) \

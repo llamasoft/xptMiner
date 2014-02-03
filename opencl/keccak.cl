@@ -84,12 +84,12 @@ dec64le_aligned(const void *src)
 
 #define enc64le_aligned(dst, val) (*((ulong*)(dst)) = (val))
 
-#define INPUT_BUF(size)   do { \
+#define INPUT_BUF(size)   { \
 		size_t j; \
 		for (j = 0; j < (size); j += 8) { \
 			kc->u.wide[j >> 3] ^= dec64le_aligned(buf + j); \
 		} \
-	} while (0)
+	}
 
 #define SPH_T64(x)    ((x) & SPH_C64(0xFFFFFFFFFFFFFFFF))
 #define SPH_ROTL64(x, n)   SPH_T64(((x) << (n)) | ((x) >> (64 - (n))))
@@ -108,7 +108,7 @@ dec64le_aligned(const void *src)
 #define XOR64_IOTA       XOR64
 
 
-#define TH_ELT(t, c0, c1, c2, c3, c4, d0, d1, d2, d3, d4)   do { \
+#define TH_ELT(t, c0, c1, c2, c3, c4, d0, d1, d2, d3, d4)   { \
 		DECL64(tt0); \
 		DECL64(tt1); \
 		DECL64(tt2); \
@@ -123,12 +123,12 @@ dec64le_aligned(const void *src)
 		XOR64(tt0, tt0, c4); \
 		XOR64(tt2, tt2, tt3); \
 		XOR64(t, tt0, tt2); \
-	} while (0)
+	}
 
 #define THETA(b00, b01, b02, b03, b04, b10, b11, b12, b13, b14, \
 	b20, b21, b22, b23, b24, b30, b31, b32, b33, b34, \
 	b40, b41, b42, b43, b44) \
-	do { \
+	{ \
 		DECL64(t0); \
 		DECL64(t1); \
 		DECL64(t2); \
@@ -164,12 +164,12 @@ dec64le_aligned(const void *src)
 		XOR64(b42, b42, t4); \
 		XOR64(b43, b43, t4); \
 		XOR64(b44, b44, t4); \
-	} while (0)
+	}
 
 #define RHO(b00, b01, b02, b03, b04, b10, b11, b12, b13, b14, \
 	b20, b21, b22, b23, b24, b30, b31, b32, b33, b34, \
 	b40, b41, b42, b43, b44) \
-	do { \
+	{ \
 		/* ROL64(b00, b00,  0); */ \
 		ROL64(b01, b01, 36); \
 		ROL64(b02, b02,  3); \
@@ -195,7 +195,7 @@ dec64le_aligned(const void *src)
 		ROL64(b42, b42, 39); \
 		ROL64(b43, b43,  8); \
 		ROL64(b44, b44, 14); \
-	} while (0)
+	}
 
 /*
  * The KHI macro integrates the "lane complement" optimization. On input,
@@ -208,22 +208,22 @@ dec64le_aligned(const void *src)
  * the input mask for the next round.
  */
 
-#define KHI_XO(d, a, b, c)   do { \
+#define KHI_XO(d, a, b, c)   { \
 		DECL64(kt); \
 		OR64(kt, b, c); \
 		XOR64(d, a, kt); \
-	} while (0)
+	}
 
-#define KHI_XA(d, a, b, c)   do { \
+#define KHI_XA(d, a, b, c)   { \
 		DECL64(kt); \
 		AND64(kt, b, c); \
 		XOR64(d, a, kt); \
-	} while (0)
+	}
 
 #define KHI(b00, b01, b02, b03, b04, b10, b11, b12, b13, b14, \
 	b20, b21, b22, b23, b24, b30, b31, b32, b33, b34, \
 	b40, b41, b42, b43, b44) \
-	do { \
+	{ \
 		DECL64(c0); \
 		DECL64(c1); \
 		DECL64(c2); \
@@ -285,11 +285,11 @@ dec64le_aligned(const void *src)
 		MOV64(b24, c2); \
 		MOV64(b34, c3); \
 		MOV64(b44, c4); \
-	} while (0)
+	}
 
 #define IOTA(r)   XOR64_IOTA(a00, a00, r)
 
-#define KF_ELT01(k)   do { \
+#define KF_ELT01(k)   { \
 		THETA ( a00, a01, a02, a03, a04, a10, a11, a12, a13, a14, a20, a21, \
 	              a22, a23, a24, a30, a31, a32, a33, a34, a40, a41, a42, a43, a44 ); \
 		RHO ( a00, a01, a02, a03, a04, a10, a11, a12, a13, a14, a20, a21, \
@@ -297,9 +297,9 @@ dec64le_aligned(const void *src)
 		KHI ( a00, a30, a10, a40, a20, a11, a41, a21, a01, a31, a22, a02, \
 	              a32, a12, a42, a33, a13, a43, a23, a03, a44, a24, a04, a34, a14 ); \
 		IOTA(k); \
-	} while (0)
+	}
 
-#define P1_TO_P0   do { \
+#define P1_TO_P0   { \
 		DECL64(t); \
 		MOV64(t, a01); \
 		MOV64(a01, a30); \
@@ -326,15 +326,15 @@ dec64le_aligned(const void *src)
 		MOV64(a14, a31); \
 		MOV64(a31, a13); \
 		MOV64(a13, t); \
-	} while (0)
+	}
 
-#define KECCAK_F_1600_   do { \
+#define KECCAK_F_1600_   { \
 		int j; \
 		for (j = 0; j < 24; j ++) { \
 			KF_ELT01(RC[j + 0]); \
 			P1_TO_P0; \
 		} \
-	} while (0)
+	}
 
 void
 keccak_init(keccak_context *kc)
