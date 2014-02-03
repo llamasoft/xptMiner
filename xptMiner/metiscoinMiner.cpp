@@ -100,6 +100,8 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 						OpenCLMain::getInstance().getDevice(0)));
 
 #ifdef MEASURE_TIME
+		printf("keccak work group size = %d\n", kernel_keccak_noinit->getWorkGroupSize(
+						OpenCLMain::getInstance().getDevice(0)));
 		q->finish();
 		uint32 end_keccak = getTimeMilliseconds();
 #endif
@@ -113,6 +115,8 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 						OpenCLMain::getInstance().getDevice(0)));
 
 #ifdef MEASURE_TIME
+		printf("shavite work group size = %d\n", kernel_shavite->getWorkGroupSize(
+						OpenCLMain::getInstance().getDevice(0)));
 		q->finish();
 		uint32 end_shavite = getTimeMilliseconds();
 #endif
@@ -141,6 +145,8 @@ void metiscoin_process(minerMetiscoinBlock_t* block)
 
 		totalCollisionCount += STEP_SIZE;
 #ifdef MEASURE_TIME
+		printf("metis work group size = %d\n", kernel_metis->getWorkGroupSize(
+						OpenCLMain::getInstance().getDevice(0)));
 		uint32 end = getTimeMilliseconds();
 		printf("Elapsed time: %d (k = %d, s = %d, m = %d) ms\n", (end-begin), (end_keccak-begin), (end_shavite-end_keccak), (end-end_shavite));
 #endif
