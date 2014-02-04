@@ -5,7 +5,11 @@ CXXFLAGS = -Wall -Wextra -std=c++0x -O2 -fomit-frame-pointer
 OSVERSION := $(shell uname -s)
 
 ifeq ($(OSVERSION),CYGWIN_NT-6.1)
-	CXXFLAGS = -Wall -Wextra -std=gnu++0x -O2 -fomit-frame-pointer 
+	CXXFLAGS = -Wall -Wextra -std=gnu++0x -O2 -fomit-frame-pointer -fpermissive
+endif
+
+ifeq ($(OSVERSION),CYGWIN_NT-6.1-WOW64)
+	CXXFLAGS = -Wall -Wextra -std=gnu++0x -O2 -fomit-frame-pointer -fpermissive
 endif
 
 CFLAGS = -Wall -Wextra -O2 -fomit-frame-pointer 
@@ -49,7 +53,14 @@ endif
 ifeq ($(OSVERSION),CYGWIN_NT-6.1)
 	EXTENSION = .exe
 	LIBS += -lOpenCL
-        LIBPATHS += -L/cygdrive/c/Program\ Files\ \(x86\)/AMD\ APP\ SDK/2.9/lib/x86_64/
+        LIBPATHS += -L/cygdrive/c/Program\ Files\ \(x86\)/AMD\ APP\ SDK/2.9/lib/x86
+	INCLUDEPATHS += -I/cygdrive/c/Program\ Files\ \(x86\)/AMD\ APP\ SDK/2.9/include
+endif
+
+ifeq ($(OSVERSION),CYGWIN_NT-6.1-WOW64)
+	EXTENSION = .exe
+	LIBS += -lOpenCL
+        LIBPATHS += -L/cygdrive/c/Program\ Files\ \(x86\)/AMD\ APP\ SDK/2.9/lib/x86
 	INCLUDEPATHS += -I/cygdrive/c/Program\ Files\ \(x86\)/AMD\ APP\ SDK/2.9/include
 endif
 
@@ -57,7 +68,7 @@ endif
 JHLIB = xptMiner/jhlib.o \
 
 OBJS = \
-        xptMiner/ticker.o \
+    xptMiner/ticker.o \
 	xptMiner/main.o \
 	xptMiner/sha2.o \
 	xptMiner/xptClient.o \

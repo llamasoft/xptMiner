@@ -12,7 +12,7 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num) {
 	printf("Initializing GPU %d\n", device_num);
 	OpenCLMain &main = OpenCLMain::getInstance();
 	OpenCLDevice* device = main.getDevice(device_num);
-	printf("Initializing Device: %s\n", device->getName().c_str());
+	printf("Initializing Device: %s (this may take a while, please be patient)\n", device->getName().c_str());
 
 //	std::vector<std::string> files_metis;
 //	files_metis.push_back("opencl/metis.cl");

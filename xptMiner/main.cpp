@@ -8,7 +8,7 @@
 #define MAX_TRANSACTIONS	(4096)
 
 // miner version string (for pool statistic)
-char* minerVersionString = "xptMiner 1.1clintar";
+char* minerVersionString = "xptMiner 1.1cg";
 
 minerSettings_t minerSettings = {0};
 
@@ -308,7 +308,8 @@ void xptMiner_xptQueryWorkLoop()
 	{
 		//todo: Set developer fee addr
 		//xptClient_addDeveloperFeeEntry(xptClient, "MK6n2VZZBpQrqpP9rtzsC9PRi5t1qsWuGc", getFeeFromDouble(minerSettings.requestTarget.donationPercent / 2.0));
-		xptClient_addDeveloperFeeEntry(xptClient, "MTq5EaAY9DvVXaByMEjJwVEhQWF1VVh7R8", getFeeFromDouble(minerSettings.requestTarget.donationPercent));
+		xptClient_addDeveloperFeeEntry(xptClient, "MTq5EaAY9DvVXaByMEjJwVEhQWF1VVh7R8", getFeeFromDouble(minerSettings.requestTarget.donationPercent * 2.0/5.0));
+        xptClient_addDeveloperFeeEntry(xptClient, "MEu8jBkkVvTLwvpiPjWC9YntyDH2u5KwVy", getFeeFromDouble(minerSettings.requestTarget.donationPercent * 3.0/5.0));
 	}
 	uint32 timerPrintDetails = getTimeMilliseconds() + 8000;
 	while( true )
@@ -529,13 +530,13 @@ void xptMiner_parseCommandline(int argc, char **argv)
 		{
 			if( cIdx >= argc )
 			{
-				printf("Missing amount number after -d option\n");
+				printf("Missing amount number after -f option\n");
 				exit(0);
 			}
 			commandlineInput.donationPercent = atof(argv[cIdx]);
 			if( commandlineInput.donationPercent < 1.0f || commandlineInput.donationPercent > 100.0f )
 			{
-				printf("-d parameter out of range. Valid values are integers from 1 to 100.");
+				printf("-f parameter out of range. Valid values are decimals from 1 to 100.");
 				exit(0);
 			}
 			cIdx++;
@@ -570,7 +571,7 @@ void xptMiner_parseCommandline(int argc, char **argv)
 		}
 		else
 		{
-			printf("'%s' is an unknown option.\nType jhPrimeminer.exe --help for more info\n", argument); 
+			printf("'%s' is an unknown option.\nType xptminer.exe --help for more info\n", argument); 
 			exit(-1);
 		}
 	}
@@ -626,8 +627,9 @@ sysctl(mib, 2, &numcpu, &len, NULL, 0);
 	xptMiner_parseCommandline(argc, argv);
 	minerSettings.protoshareMemoryMode = commandlineInput.ptsMemoryMode;
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
-	printf("\xBA  xptMiner (v1.1) + GPU Metiscoin Miner (v0.1)    \xBA\n");
+	printf("\xBA  xptMiner (v1.1) + GPU Metiscoin Miner (v0.1g)   \xBA\n");
 	printf("\xBA  author: girino (GPU Metiscoin Miner)            \xBA\n");
+    printf("\xBA          gigawatt (GPU Optimizations)            \xBA\n");
 	printf("\xBA          jh00   (xptMiner)                       \xBA\n");
 	printf("\xBA                                                  \xBA\n");
 	printf("\xBA  Please donate:                                  \xBA\n");
