@@ -3,8 +3,9 @@
 #include "ticker.h"
 #include "metiscoinMiner.h"
 
-#define STEP_SIZE 0x8000
-#define NUM_STEPS 0x1000
+#define STEP_SIZE 0x80000
+#define NUM_STEPS 0x100
+#define STEP_MULTIPLIER 0x10000
 
 MetiscoinOpenCL::MetiscoinOpenCL(int _device_num) {
 	this->device_num = _device_num;
@@ -79,7 +80,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		kernel_keccak_noinit->addGlobalArg(u);
 		kernel_keccak_noinit->addGlobalArg(buff);
 		kernel_keccak_noinit->addGlobalArg(hashes);
-		kernel_keccak_noinit->addScalarUInt(n * 0x10000);
+		kernel_keccak_noinit->addScalarUInt(n * STEP_SIZE);
 
 		sph_keccak512_context	 ctx_keccak;
 		sph_keccak512_init(&ctx_keccak);
@@ -114,7 +115,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		kernel_metis->addGlobalArg(hashes);
 		kernel_metis->addGlobalArg(out);
 		kernel_metis->addGlobalArg(out_count);
-		kernel_metis->addScalarUInt(n*0x10000);
+		kernel_metis->addScalarUInt(n*STEP_SIZE);
 		kernel_metis->addScalarUInt(target);
 
 		cl_uint out_count_tmp = 0;
@@ -161,8 +162,9 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 
 
 		// validator
-		block->nonce = n * 0x10000;
-		for (int f = 0; f < STEP_SIZE; f++) {
+		for (int f2 = 0; f2 < STEP_SIZE/0x8000; f2++) {
+		block->nonce = (n*STEP_SIZE/0x8000) * STEP_MULTIPLIER + f2 * STEP_MULTIPLIER;
+		for (int f = 0; f < 0x8000; f++) {
 			sph_keccak512_context	 ctx_keccak;
 			sph_shavite512_context	 ctx_shavite;
 			sph_metis512_context	 ctx_metis;
@@ -182,7 +184,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 			sph_metis512(&ctx_metis, hash1, 64);
 			sph_metis512_close(&ctx_metis, hash2);
 
-			hash2_2 = tmp_hashes+(f*8);
+			hash2_2 = tmp_hashes+(f*8)+(f2*8*0x8000);
 
 			for (int i = 0; i < 8; i++) {
 				if (hash2[i] != hash2_2[i]) {
@@ -191,6 +193,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 			}
 
 			block->nonce++;
+		}
 		}
 		delete tmp_hashes;
 		block->nonce = 0;
