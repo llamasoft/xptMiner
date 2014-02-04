@@ -193,8 +193,8 @@ void xptMiner_submitShare(minerPrimecoinBlock_t* block);
 void xptMiner_submitShare(minerMetiscoinBlock_t* block);
 
 // stats
-extern volatile uint32 totalCollisionCount;
-extern volatile uint32 totalShareCount;
+extern volatile uint64 totalCollisionCount;
+extern volatile uint64 totalShareCount;
 
 extern volatile uint32 monitorCurrentBlockHeight;
 

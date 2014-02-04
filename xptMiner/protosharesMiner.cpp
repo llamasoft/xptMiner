@@ -10,8 +10,8 @@ __declspec( thread ) uint32* __collisionMap = NULL;
 #else
   uint32* __collisionMap = NULL;
 #endif
-volatile uint32 totalCollisionCount = 0;
-volatile uint32 totalShareCount = 0;
+volatile uint64 totalCollisionCount = 0;
+volatile uint64 totalShareCount = 0;
 
 bool protoshares_revalidateCollision(minerProtosharesBlock_t* block, uint8* midHash, uint32 indexA, uint32 indexB)
 {

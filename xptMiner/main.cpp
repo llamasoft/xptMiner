@@ -321,32 +321,14 @@ void xptMiner_xptQueryWorkLoop()
 			{
 				uint32 passedSeconds = (uint32)time(NULL) - miningStartTime;
 				double speedRate = 0.0;
-				if( workDataSource.algorithm == ALGORITHM_PROTOSHARES )
-				{
-					// speed is represented as collisions/min
-					if( passedSeconds > 5 )
-					{
-						speedRate = (double)totalCollisionCount / (double)passedSeconds * 60.0;
-					}
-					printf("collisions/min: %.4lf Shares total: %d\n", speedRate, totalShareCount);
-				}
-				else if( workDataSource.algorithm == ALGORITHM_SCRYPT )
-				{
-					// speed is represented as khash/s
-					if( passedSeconds > 5 )
-					{
-						speedRate = (double)totalCollisionCount / (double)passedSeconds / 1000.0;
-					}
-					printf("kHash/s: %.2lf Shares total: %d\n", speedRate, totalShareCount);
-				}
-				else if( workDataSource.algorithm == ALGORITHM_METISCOIN )
+				if( workDataSource.algorithm == ALGORITHM_METISCOIN )
 				{
 				  // speed is represented as khash/s (in steps of 0x8000)
 				  if( passedSeconds > 5 )
 				  {
 					speedRate = (double)totalCollisionCount /** 32768.0*/ / (double)passedSeconds / 1000.0;
 				  }
-				  printf("kHash/s: %.2lf Shares total: %d\n", speedRate, totalShareCount);
+				  printf("kHash/s: %.2lf Shares total: %ld\n", speedRate, totalShareCount);
 				}
 
 			}
