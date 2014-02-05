@@ -150,16 +150,14 @@ constant ulong RC[] __attribute__ ((aligned)) = {
 ulong
 dec64le_aligned(const void *src)
 {
-    return as_ulong(as_uchar8(src).s76543210);
-    
-	// return (ulong)(((const unsigned char *)src)[0])
-	// 	| ((ulong)(((const unsigned char *)src)[1]) << 8)
-	// 	| ((ulong)(((const unsigned char *)src)[2]) << 16)
-	// 	| ((ulong)(((const unsigned char *)src)[3]) << 24)
-	// 	| ((ulong)(((const unsigned char *)src)[4]) << 32)
-	// 	| ((ulong)(((const unsigned char *)src)[5]) << 40)
-	// 	| ((ulong)(((const unsigned char *)src)[6]) << 48)
-	// 	| ((ulong)(((const unsigned char *)src)[7]) << 56);
+	return (ulong)(((const unsigned char *)src)[0])
+		| ((ulong)(((const unsigned char *)src)[1]) << 8)
+		| ((ulong)(((const unsigned char *)src)[2]) << 16)
+		| ((ulong)(((const unsigned char *)src)[3]) << 24)
+		| ((ulong)(((const unsigned char *)src)[4]) << 32)
+		| ((ulong)(((const unsigned char *)src)[5]) << 40)
+		| ((ulong)(((const unsigned char *)src)[6]) << 48)
+		| ((ulong)(((const unsigned char *)src)[7]) << 56);
 }
 
 

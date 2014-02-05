@@ -103,7 +103,7 @@ void print_err_msg(cl_int err_code) {
 //	}
 //}
 
-void error_callback_func (const char *errinfo,
+void CL_CALLBACK error_callback_func (const char *errinfo,
                     const void *private_info, size_t cb,
                     void *user_data) {
 #ifdef DEBUG
@@ -131,11 +131,13 @@ OpenCLPlatform::OpenCLPlatform(cl_platform_id id, cl_device_type device_type) {
 	}
 
 	// iterates through devices
-	cl_device_id all_devices[num_devices];
+	cl_device_id *all_devices = new cl_device_id[num_devices];
 	check_error(clGetDeviceIDs(my_id, device_type, num_devices, all_devices, NULL));
 	for (int i = 0; i < num_devices; i++) {
 		devices.push_back(new OpenCLDevice(all_devices[i], this));
 	}
+
+    delete[] all_devices;
 }
 
 OpenCLPlatform::~OpenCLPlatform() {
@@ -161,11 +163,13 @@ OpenCLMain::OpenCLMain() {
 		fprintf(stderr, "ERROR: no valid platforms found\n");
 		assert(num_platforms > 0);
 	}
-	cl_platform_id all_platforms[num_platforms];
+	cl_platform_id *all_platforms = new cl_platform_id[num_platforms];
 	check_error(clGetPlatformIDs(num_platforms, all_platforms, NULL));
 	for (int i = 0; i < num_platforms; i++) {
 		platforms.push_back(new OpenCLPlatform(all_platforms[i]));
 	}
+
+    delete[] all_platforms;
 }
 
 OpenCLMain::~OpenCLMain() {
@@ -205,9 +209,10 @@ cl_device_id OpenCLDevice::getDeviceId() {
 std::string OpenCLDevice::getName() {
 	size_t param_value_size_ret;
 	check_error(clGetDeviceInfo(my_id, CL_DEVICE_NAME, 0, NULL, &param_value_size_ret));
-	char name[param_value_size_ret];
+	char *name = new char[param_value_size_ret];
 	check_error(clGetDeviceInfo(my_id, CL_DEVICE_NAME, param_value_size_ret, name, NULL));
 	return std::string(name);
+    delete[] name;
 }
 
 long OpenCLDevice::getMaxWorkGroupSize() {
@@ -242,12 +247,13 @@ int OpenCLDevice::getMaxWorkItemDimensions() {
 
 std::vector<long> OpenCLDevice::getMaxWorkItemSizes() {
 	int size = getMaxWorkItemDimensions();
-	cl_ulong value[size];
+	cl_ulong *value = new cl_ulong[size];
 	check_error(clGetDeviceInfo(my_id, CL_DEVICE_MAX_WORK_ITEM_SIZES, (sizeof(cl_ulong)*size), &value, NULL));
 	std::vector<long> ret;
 	for (int i = 0; i < size; i++) {
 		ret.push_back(value[i]);
 	}
+    delete[] value;
 	return ret;
 }
 
@@ -291,9 +297,9 @@ OpenCLProgram* OpenCLContext::loadProgramFromFiles(std::vector<std::string> file
 }
 
 OpenCLProgram* OpenCLContext::loadProgramFromStrings(std::vector<std::string> file_strs) {
-
-	const char * str_ptr[file_strs.size()];
-	size_t size_ptr[file_strs.size()];
+    // Unsure about this
+	const char **str_ptr = new const char*[file_strs.size()];
+	size_t *size_ptr = new size_t[file_strs.size()];
 	for (int i = 0; i < file_strs.size(); i++) {
 		str_ptr[i] = file_strs[i].c_str();
 		size_ptr[i] = file_strs[i].size();
@@ -310,7 +316,7 @@ OpenCLProgram* OpenCLContext::loadProgramFromStrings(std::vector<std::string> fi
 		// uses first device for error messages
 		size_t length;
 		check_error(clGetProgramBuildInfo(program, devices[0]->getDeviceId(), CL_PROGRAM_BUILD_LOG, 0, NULL, &length));
-		char buffer[length+1];
+		char *buffer = new char[length+1];
 		check_error(clGetProgramBuildInfo(program, devices[0]->getDeviceId(), CL_PROGRAM_BUILD_LOG, length, buffer, &length));
 		std::cout<<"--- Build log ---"<<std::endl<<buffer<<std::endl<<"---  End log  ---"<<std::endl;
 		assert(!error);
@@ -318,6 +324,9 @@ OpenCLProgram* OpenCLContext::loadProgramFromStrings(std::vector<std::string> fi
 
 	OpenCLProgram* ret = new OpenCLProgram(program, this);
 	programs.push_back(ret);
+
+    delete[] str_ptr;
+    delete[] size_ptr;
 	return ret;
 }
 
@@ -525,9 +534,12 @@ void OpenCLMain::listDevices() {
 std::string OpenCLPlatform::getName() {
 	size_t param_value_size_ret;
 	check_error(clGetPlatformInfo(my_id, CL_PLATFORM_NAME, 0, NULL, &param_value_size_ret));
-	char name[param_value_size_ret];
+	char *name = new char[param_value_size_ret];
 	check_error(clGetPlatformInfo(my_id, CL_PLATFORM_NAME, param_value_size_ret, name, NULL));
-	return std::string(name);
+
+    std::string rtn(name);
+    delete[] name;
+	return rtn;
 }
 
 cl_platform_id OpenCLPlatform::getId() {

@@ -15,7 +15,7 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num) {
 	OpenCLMain &main = OpenCLMain::getInstance();
 	OpenCLDevice* device = main.getDevice(device_num);
 	printf("Initializing Device: %s\n", device->getName().c_str());
-
+    printf("\n");
 	printf("Compiling OpenCL code... this may take 3-5 minutes\n");
 	std::vector<std::string> files_keccak;
 	files_keccak.push_back("opencl/keccak.cl");
@@ -128,7 +128,9 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		totalCollisionCount += STEP_SIZE;
 #ifdef MEASURE_TIME
 		uint32 end = getTimeMilliseconds();
+        uint32 overhead = (end-begin) - (end_keccak-begin) - (end_shavite-end_keccak) - (end-end_shavite);
 		printf("Elapsed time: %d (k = %d, s = %d, m = %d) ms\n", (end-begin), (end_keccak-begin), (end_shavite-end_keccak), (end-end_shavite));
+        printf("Total Overhead: %d ms\n", overhead);
 #endif
 
 #ifdef VALIDATE_ALGORITHMS
@@ -149,7 +151,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		}
 
 		if (aaa != out_count_tmp) {
-			printf ("************* ERRO ****************\n");
+			printf ("************* ERROR ****************\n");
 			exit(0);
 		}
 
