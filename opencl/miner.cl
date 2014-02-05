@@ -51,33 +51,6 @@ kernel void metiscoin_process(constant  const   ulong*  u,
     }
 }
 
-kernel void keccak_step(constant const char* in, global ulong* out, uint begin_nonce) {
-
-	size_t id = get_global_id(0);
-	uint nonce = (uint)id + begin_nonce;
-
-	keccak_context	 ctx_keccak;
-	char data[80];
-	ulong hash[8];
-
-	// prepares data
-	for (int i = 0; i < 80; i++) {
-		data[i] = in[i];
-	}
-	char * p = (char*)&nonce;
-	for (int i = 0; i < 4; i++) {
-		data[76+i] = p[i];
-	}
-
-	// keccak
-	keccak_init(&ctx_keccak);
-	keccak_core_80(&ctx_keccak, data);
-	keccak_close(&ctx_keccak, hash);
-
-	for (int i = 0; i < 8; i++) {
-		out[(id * 8)+i] = hash[i];
-	}
-}
 
 kernel void keccak_step_noinit(constant const ulong* u, constant const char* buff, global ulong* out, uint begin_nonce) {
 

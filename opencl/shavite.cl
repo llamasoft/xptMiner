@@ -1,3 +1,4 @@
+
 #ifdef _ECLIPSE_OPENCL_HEADER
 #   include "OpenCLKernel.hpp"
 #endif
@@ -5,11 +6,11 @@
 typedef struct {
 	unsigned char buf[128];    /* first field, for alignment */
 	uint h[16];
-} shavite_context;
+} __attribute__ ((aligned)) shavite_context;
 
 #define C32(x)    ((uint)(x))
 
-__constant const uint IV512shavite[] = {
+__constant const uint IV512shavite[] __attribute__ ((aligned)) = {
 	C32(0x72FCCDD8), C32(0x79CA4727), C32(0x128A077B), C32(0x40D55AEC),
 	C32(0xD1901A06), C32(0x430AE307), C32(0xB29F5CD1), C32(0xDF07FBFC),
 	C32(0x8E45D73D), C32(0x681AB538), C32(0xBDE86578), C32(0xDD577E47),
@@ -23,54 +24,45 @@ shavite_init(shavite_context *sc)
 	for (int i = 0; i < 16; i++) sc->h[i] = IV512shavite[i];
 }
 
-#define SPH_T32(x)    ((x) & SPH_C32(0xFFFFFFFF))
-#define SPH_C32(x)    ((uint)(x))
-#define AESx(x)   SPH_C32(x)
-#define AES0      AES0_LE
-#define AES1      AES1_LE
-#define AES2      AES2_LE
-#define AES3      AES3_LE
+#define SPH_T32(x)  ((x) & SPH_C32(0xFFFFFFFF))
+#define SPH_C32(x)  ((uint)(x))
+#define AESx(x)     SPH_C32(x)
+#define AES0        AES0_LE
+#define AES1        AES1_LE
+#define AES2        AES2_LE
+#define AES3        AES3_LE
 
-#define AES_ROUND_LE(X0, X1, X2, X3, K0, K1, K2, K3, Y0, Y1, Y2, Y3)   { \
-		(Y0) = AES0[(X0) & 0xFF] \
-			^ AES1[((X1) >> 8) & 0xFF] \
-			^ AES2[((X2) >> 16) & 0xFF] \
-			^ AES3[((X3) >> 24) & 0xFF] ^ (K0); \
-		(Y1) = AES0[(X1) & 0xFF] \
-			^ AES1[((X2) >> 8) & 0xFF] \
-			^ AES2[((X3) >> 16) & 0xFF] \
-			^ AES3[((X0) >> 24) & 0xFF] ^ (K1); \
-		(Y2) = AES0[(X2) & 0xFF] \
-			^ AES1[((X3) >> 8) & 0xFF] \
-			^ AES2[((X0) >> 16) & 0xFF] \
-			^ AES3[((X1) >> 24) & 0xFF] ^ (K2); \
-		(Y3) = AES0[(X3) & 0xFF] \
-			^ AES1[((X0) >> 8) & 0xFF] \
-			^ AES2[((X1) >> 16) & 0xFF] \
-			^ AES3[((X2) >> 24) & 0xFF] ^ (K3); \
+#define AES_ROUND_LE(X, Y)   { \
+		(Y.s0) = AES0[(X.s0) & 0xFF] \
+			   ^ AES1[((X.s1) >> 8) & 0xFF] \
+			   ^ AES2[((X.s2) >> 16) & 0xFF] \
+			   ^ AES3[((X.s3) >> 24) & 0xFF]; \
+		(Y.s1) = AES0[(X.s1) & 0xFF] \
+			   ^ AES1[((X.s2) >> 8) & 0xFF] \
+			   ^ AES2[((X.s3) >> 16) & 0xFF] \
+			   ^ AES3[((X.s0) >> 24) & 0xFF]; \
+		(Y.s2) = AES0[(X.s2) & 0xFF] \
+			   ^ AES1[((X.s3) >> 8) & 0xFF] \
+			   ^ AES2[((X.s0) >> 16) & 0xFF] \
+			   ^ AES3[((X.s1) >> 24) & 0xFF]; \
+		(Y.s3) = AES0[(X.s3) & 0xFF] \
+			   ^ AES1[((X.s0) >> 8) & 0xFF] \
+			   ^ AES2[((X.s1) >> 16) & 0xFF] \
+			   ^ AES3[((X.s2) >> 24) & 0xFF]; \
 	}
 
-#define AES_ROUND_NOKEY_LE(X0, X1, X2, X3, Y0, Y1, Y2, Y3) \
-	AES_ROUND_LE(X0, X1, X2, X3, 0, 0, 0, 0, Y0, Y1, Y2, Y3)
+#define AES_ROUND_NOKEY_LE(X, Y) \
+	AES_ROUND_LE(X, Y)
 
-#define AES_ROUND_NOKEY(x0, x1, x2, x3)   { \
-		uint t0 = (x0); \
-		uint t1 = (x1); \
-		uint t2 = (x2); \
-		uint t3 = (x3); \
-		AES_ROUND_NOKEY_LE(t0, t1, t2, t3, x0, x1, x2, x3); \
+#define AES_ROUND_NOKEY(x)   { \
+        uint4 t = x; \
+		AES_ROUND_NOKEY_LE(t, x); \
 	}
 
-#define KEY_EXPAND_ELT(k0, k1, k2, k3)   { \
-		uint kt; \
-		AES_ROUND_NOKEY(k1, k2, k3, k0); \
-		kt = (k0); \
-		(k0) = (k1); \
-		(k1) = (k2); \
-		(k2) = (k3); \
-		(k3) = kt; \
+#define KEY_EXPAND_ELT(k)   { \
+		AES_ROUND_NOKEY(k); \
+        k = k.s1230; \
 	}
-
 
 /*
  * The AES*[] tables allow us to perform a fast evaluation of an AES
@@ -78,7 +70,7 @@ shavite_init(shavite_context *sc)
  * MixColumns for the column where that byte goes after ShiftRows.
  */
 
-__constant uint AES0[256] = {
+__constant uint AES0[256] __attribute__ ((aligned)) = {
 	AESx(0xA56363C6), AESx(0x847C7CF8), AESx(0x997777EE), AESx(0x8D7B7BF6),
 	AESx(0x0DF2F2FF), AESx(0xBD6B6BD6), AESx(0xB16F6FDE), AESx(0x54C5C591),
 	AESx(0x50303060), AESx(0x03010102), AESx(0xA96767CE), AESx(0x7D2B2B56),
@@ -145,7 +137,7 @@ __constant uint AES0[256] = {
 	AESx(0xCBB0B07B), AESx(0xFC5454A8), AESx(0xD6BBBB6D), AESx(0x3A16162C)
 };
 
-__constant uint AES1[256] = {
+__constant uint AES1[256] __attribute__ ((aligned)) = {
 	AESx(0x6363C6A5), AESx(0x7C7CF884), AESx(0x7777EE99), AESx(0x7B7BF68D),
 	AESx(0xF2F2FF0D), AESx(0x6B6BD6BD), AESx(0x6F6FDEB1), AESx(0xC5C59154),
 	AESx(0x30306050), AESx(0x01010203), AESx(0x6767CEA9), AESx(0x2B2B567D),
@@ -212,7 +204,7 @@ __constant uint AES1[256] = {
 	AESx(0xB0B07BCB), AESx(0x5454A8FC), AESx(0xBBBB6DD6), AESx(0x16162C3A)
 };
 
-__constant uint AES2[256] = {
+__constant uint AES2[256] __attribute__ ((aligned)) = {
 	AESx(0x63C6A563), AESx(0x7CF8847C), AESx(0x77EE9977), AESx(0x7BF68D7B),
 	AESx(0xF2FF0DF2), AESx(0x6BD6BD6B), AESx(0x6FDEB16F), AESx(0xC59154C5),
 	AESx(0x30605030), AESx(0x01020301), AESx(0x67CEA967), AESx(0x2B567D2B),
@@ -279,7 +271,7 @@ __constant uint AES2[256] = {
 	AESx(0xB07BCBB0), AESx(0x54A8FC54), AESx(0xBB6DD6BB), AESx(0x162C3A16)
 };
 
-__constant uint AES3[256] = {
+__constant uint AES3[256] __attribute__ ((aligned)) = {
 	AESx(0xC6A56363), AESx(0xF8847C7C), AESx(0xEE997777), AESx(0xF68D7B7B),
 	AESx(0xFF0DF2F2), AESx(0xD6BD6B6B), AESx(0xDEB16F6F), AESx(0x9154C5C5),
 	AESx(0x60503030), AESx(0x02030101), AESx(0xCEA96767), AESx(0x567D2B2B),
@@ -359,572 +351,330 @@ __constant uint AES3[256] = {
 inline void
 c512(shavite_context *sc, const void *msg)
 {
-	uint p0, p1, p2, p3, p4, p5, p6, p7;
-	uint p8, p9, pA, pB, pC, pD, pE, pF;
-	uint x0, x1, x2, x3;
-	uint rk00, rk01, rk02, rk03, rk04, rk05, rk06, rk07;
-	uint rk08, rk09, rk0A, rk0B, rk0C, rk0D, rk0E, rk0F;
-	uint rk10, rk11, rk12, rk13, rk14, rk15, rk16, rk17;
-	uint rk18, rk19, rk1A, rk1B, rk1C, rk1D, rk1E, rk1F;
+	//uint p0, p1, p2, p3, p4, p5, p6, p7;
+	//uint p8, p9, pA, pB, pC, pD, pE, pF;
+    uint4 p0_3, p4_7, p8_B, pC_F;
+    
+	//uint x0, x1, x2, x3;
+    uint4 x;
+    
+	//uint rk00, rk01, rk02, rk03, rk04, rk05, rk06, rk07;
+	//uint rk08, rk09, rk0A, rk0B, rk0C, rk0D, rk0E, rk0F;
+	//uint rk10, rk11, rk12, rk13, rk14, rk15, rk16, rk17;
+	//uint rk18, rk19, rk1A, rk1B, rk1C, rk1D, rk1E, rk1F;
+    uint4 rk00_03, rk04_07, rk08_0B, rk0C_0F;
+    uint4 rk10_13, rk14_17, rk18_1B, rk1C_1F;
+    
 	int r;
 
-	p0 = sc->h[0x0];
-	p1 = sc->h[0x1];
-	p2 = sc->h[0x2];
-	p3 = sc->h[0x3];
-	p4 = sc->h[0x4];
-	p5 = sc->h[0x5];
-	p6 = sc->h[0x6];
-	p7 = sc->h[0x7];
-	p8 = sc->h[0x8];
-	p9 = sc->h[0x9];
-	pA = sc->h[0xA];
-	pB = sc->h[0xB];
-	pC = sc->h[0xC];
-	pD = sc->h[0xD];
-	pE = sc->h[0xE];
-	pF = sc->h[0xF];
+	p0_3.s0 = sc->h[0x0];
+	p0_3.s1 = sc->h[0x1];
+	p0_3.s2 = sc->h[0x2];
+	p0_3.s3 = sc->h[0x3];
+	p4_7.s0 = sc->h[0x4];
+	p4_7.s1 = sc->h[0x5];
+	p4_7.s2 = sc->h[0x6];
+	p4_7.s3 = sc->h[0x7];
+	p8_B.s0 = sc->h[0x8];
+	p8_B.s1 = sc->h[0x9];
+	p8_B.s2 = sc->h[0xA];
+	p8_B.s3 = sc->h[0xB];
+	pC_F.s0 = sc->h[0xC];
+	pC_F.s1 = sc->h[0xD];
+	pC_F.s2 = sc->h[0xE];
+	pC_F.s3 = sc->h[0xF];
 	/* round 0 */
-	rk00 = sph_dec32le_aligned((const unsigned char *)msg +   0);
-	x0 = p4 ^ rk00;
-	rk01 = sph_dec32le_aligned((const unsigned char *)msg +   4);
-	x1 = p5 ^ rk01;
-	rk02 = sph_dec32le_aligned((const unsigned char *)msg +   8);
-	x2 = p6 ^ rk02;
-	rk03 = sph_dec32le_aligned((const unsigned char *)msg +  12);
-	x3 = p7 ^ rk03;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	rk04 = sph_dec32le_aligned((const unsigned char *)msg +  16);
-	x0 ^= rk04;
-	rk05 = sph_dec32le_aligned((const unsigned char *)msg +  20);
-	x1 ^= rk05;
-	rk06 = sph_dec32le_aligned((const unsigned char *)msg +  24);
-	x2 ^= rk06;
-	rk07 = sph_dec32le_aligned((const unsigned char *)msg +  28);
-	x3 ^= rk07;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	rk08 = sph_dec32le_aligned((const unsigned char *)msg +  32);
-	x0 ^= rk08;
-	rk09 = sph_dec32le_aligned((const unsigned char *)msg +  36);
-	x1 ^= rk09;
-	rk0A = sph_dec32le_aligned((const unsigned char *)msg +  40);
-	x2 ^= rk0A;
-	rk0B = sph_dec32le_aligned((const unsigned char *)msg +  44);
-	x3 ^= rk0B;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	rk0C = sph_dec32le_aligned((const unsigned char *)msg +  48);
-	x0 ^= rk0C;
-	rk0D = sph_dec32le_aligned((const unsigned char *)msg +  52);
-	x1 ^= rk0D;
-	rk0E = sph_dec32le_aligned((const unsigned char *)msg +  56);
-	x2 ^= rk0E;
-	rk0F = sph_dec32le_aligned((const unsigned char *)msg +  60);
-	x3 ^= rk0F;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	p0 ^= x0;
-	p1 ^= x1;
-	p2 ^= x2;
-	p3 ^= x3;
-	rk10 = sph_dec32le_aligned((const unsigned char *)msg +  64);
-	x0 = pC ^ rk10;
-	rk11 = sph_dec32le_aligned((const unsigned char *)msg +  68);
-	x1 = pD ^ rk11;
-	rk12 = sph_dec32le_aligned((const unsigned char *)msg +  72);
-	x2 = pE ^ rk12;
-	rk13 = sph_dec32le_aligned((const unsigned char *)msg +  76);
-	x3 = pF ^ rk13;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	rk14 = sph_dec32le_aligned((const unsigned char *)msg +  80);
-	x0 ^= rk14;
-	rk15 = sph_dec32le_aligned((const unsigned char *)msg +  84);
-	x1 ^= rk15;
-	rk16 = sph_dec32le_aligned((const unsigned char *)msg +  88);
-	x2 ^= rk16;
-	rk17 = sph_dec32le_aligned((const unsigned char *)msg +  92);
-	x3 ^= rk17;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	rk18 = sph_dec32le_aligned((const unsigned char *)msg +  96);
-	x0 ^= rk18;
-	rk19 = sph_dec32le_aligned((const unsigned char *)msg + 100);
-	x1 ^= rk19;
-	rk1A = sph_dec32le_aligned((const unsigned char *)msg + 104);
-	x2 ^= rk1A;
-	rk1B = sph_dec32le_aligned((const unsigned char *)msg + 108);
-	x3 ^= rk1B;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	rk1C = sph_dec32le_aligned((const unsigned char *)msg + 112);
-	x0 ^= rk1C;
-	rk1D = sph_dec32le_aligned((const unsigned char *)msg + 116);
-	x1 ^= rk1D;
-	rk1E = sph_dec32le_aligned((const unsigned char *)msg + 120);
-	x2 ^= rk1E;
-	rk1F = sph_dec32le_aligned((const unsigned char *)msg + 124);
-	x3 ^= rk1F;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	p8 ^= x0;
-	p9 ^= x1;
-	pA ^= x2;
-	pB ^= x3;
+	rk00_03.s0 = sph_dec32le_aligned((const unsigned char *)msg +   0);
+	rk00_03.s1 = sph_dec32le_aligned((const unsigned char *)msg +   4);
+	rk00_03.s2 = sph_dec32le_aligned((const unsigned char *)msg +   8);
+	rk00_03.s3 = sph_dec32le_aligned((const unsigned char *)msg +  12);
+	x = p4_7 ^ rk00_03;
+	AES_ROUND_NOKEY(x);
+	rk04_07.s0 = sph_dec32le_aligned((const unsigned char *)msg +  16);
+	rk04_07.s1 = sph_dec32le_aligned((const unsigned char *)msg +  20);
+	rk04_07.s2 = sph_dec32le_aligned((const unsigned char *)msg +  24);
+	rk04_07.s3 = sph_dec32le_aligned((const unsigned char *)msg +  28);
+	x ^= rk04_07;
+	AES_ROUND_NOKEY(x)
+	rk08_0B.s0 = sph_dec32le_aligned((const unsigned char *)msg +  32);
+	rk08_0B.s1 = sph_dec32le_aligned((const unsigned char *)msg +  36);
+	rk08_0B.s2 = sph_dec32le_aligned((const unsigned char *)msg +  40);
+	rk08_0B.s3 = sph_dec32le_aligned((const unsigned char *)msg +  44);
+	x ^= rk08_0B;
+	AES_ROUND_NOKEY(x)
+	rk0C_0F.s0 = sph_dec32le_aligned((const unsigned char *)msg +  48);
+	rk0C_0F.s1 = sph_dec32le_aligned((const unsigned char *)msg +  52);
+	rk0C_0F.s2 = sph_dec32le_aligned((const unsigned char *)msg +  56);
+	rk0C_0F.s3 = sph_dec32le_aligned((const unsigned char *)msg +  60);
+	x ^= rk0C_0F;
+	AES_ROUND_NOKEY(x)
+	p0_3 ^= x;
+	rk10_13.s0 = sph_dec32le_aligned((const unsigned char *)msg +  64);
+	rk10_13.s1 = sph_dec32le_aligned((const unsigned char *)msg +  68);
+	rk10_13.s2 = sph_dec32le_aligned((const unsigned char *)msg +  72);
+	rk10_13.s3 = sph_dec32le_aligned((const unsigned char *)msg +  76);
+	x = pC_F ^ rk10_13;
+	AES_ROUND_NOKEY(x)
+	rk14_17.s0 = sph_dec32le_aligned((const unsigned char *)msg +  80);
+	rk14_17.s1 = sph_dec32le_aligned((const unsigned char *)msg +  84);
+	rk14_17.s2 = sph_dec32le_aligned((const unsigned char *)msg +  88);
+	rk14_17.s3 = sph_dec32le_aligned((const unsigned char *)msg +  92);
+	x ^= rk14_17;
+	AES_ROUND_NOKEY(x)
+	rk18_1B.s0 = sph_dec32le_aligned((const unsigned char *)msg +  96);
+	rk18_1B.s1 = sph_dec32le_aligned((const unsigned char *)msg + 100);
+	rk18_1B.s2 = sph_dec32le_aligned((const unsigned char *)msg + 104);
+	rk18_1B.s3 = sph_dec32le_aligned((const unsigned char *)msg + 108);
+	x ^= rk18_1B;
+	AES_ROUND_NOKEY(x)
+	rk1C_1F.s0 = sph_dec32le_aligned((const unsigned char *)msg + 112);
+	rk1C_1F.s1 = sph_dec32le_aligned((const unsigned char *)msg + 116);
+	rk1C_1F.s2 = sph_dec32le_aligned((const unsigned char *)msg + 120);
+	rk1C_1F.s3 = sph_dec32le_aligned((const unsigned char *)msg + 124);
+	x ^= rk1C_1F;
+	AES_ROUND_NOKEY(x)
+	p8_B ^= x;
 
 #pragma unroll
 	for (r = 0; r < 3; r ++) {
 		/* round 1, 5, 9 */
-		KEY_EXPAND_ELT(rk00, rk01, rk02, rk03);
-		rk00 ^= rk1C;
-		rk01 ^= rk1D;
-		rk02 ^= rk1E;
-		rk03 ^= rk1F;
+		KEY_EXPAND_ELT(rk00_03);
+		rk00_03 ^= rk1C_1F;
 		if (r == 0) {
-			rk00 ^= 512;
-			rk03 ^= 0xFFFFFFFF;
+			rk00_03.s0 ^= 512;
+			rk00_03.s3 ^= 0xFFFFFFFF;
 		}
-		x0 = p0 ^ rk00;
-		x1 = p1 ^ rk01;
-		x2 = p2 ^ rk02;
-		x3 = p3 ^ rk03;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		KEY_EXPAND_ELT(rk04, rk05, rk06, rk07);
-		rk04 ^= rk00;
-		rk05 ^= rk01;
-		rk06 ^= rk02;
-		rk07 ^= rk03;
+		x = p0_3 ^ rk00_03;
+		AES_ROUND_NOKEY(x)
+		KEY_EXPAND_ELT(rk04_07);
+		rk04_07 ^= rk00_03;
 		if (r == 1) {
-			rk07 ^= 0xfffffdff;
+			rk04_07.s3 ^= 0xfffffdff;
 		}
-		x0 ^= rk04;
-		x1 ^= rk05;
-		x2 ^= rk06;
-		x3 ^= rk07;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		KEY_EXPAND_ELT(rk08, rk09, rk0A, rk0B);
-		rk08 ^= rk04;
-		rk09 ^= rk05;
-		rk0A ^= rk06;
-		rk0B ^= rk07;
-		x0 ^= rk08;
-		x1 ^= rk09;
-		x2 ^= rk0A;
-		x3 ^= rk0B;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		KEY_EXPAND_ELT(rk0C, rk0D, rk0E, rk0F);
-		rk0C ^= rk08;
-		rk0D ^= rk09;
-		rk0E ^= rk0A;
-		rk0F ^= rk0B;
-		x0 ^= rk0C;
-		x1 ^= rk0D;
-		x2 ^= rk0E;
-		x3 ^= rk0F;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		pC ^= x0;
-		pD ^= x1;
-		pE ^= x2;
-		pF ^= x3;
-		KEY_EXPAND_ELT(rk10, rk11, rk12, rk13);
-		rk10 ^= rk0C;
-		rk11 ^= rk0D;
-		rk12 ^= rk0E;
-		rk13 ^= rk0F;
-		x0 = p8 ^ rk10;
-		x1 = p9 ^ rk11;
-		x2 = pA ^ rk12;
-		x3 = pB ^ rk13;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		KEY_EXPAND_ELT(rk14, rk15, rk16, rk17);
-		rk14 ^= rk10;
-		rk15 ^= rk11;
-		rk16 ^= rk12;
-		rk17 ^= rk13;
-		x0 ^= rk14;
-		x1 ^= rk15;
-		x2 ^= rk16;
-		x3 ^= rk17;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		KEY_EXPAND_ELT(rk18, rk19, rk1A, rk1B);
-		rk18 ^= rk14;
-		rk19 ^= rk15;
-		rk1A ^= rk16;
-		rk1B ^= rk17;
-		x0 ^= rk18;
-		x1 ^= rk19;
-		x2 ^= rk1A;
-		x3 ^= rk1B;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		KEY_EXPAND_ELT(rk1C, rk1D, rk1E, rk1F);
-		rk1C ^= rk18;
-		rk1D ^= rk19;
-		rk1E ^= rk1A;
-		rk1F ^= rk1B;
+		x ^= rk04_07;
+		AES_ROUND_NOKEY(x)
+		KEY_EXPAND_ELT(rk08_0B);
+		rk08_0B ^= rk04_07;
+		x ^= rk08_0B;
+		AES_ROUND_NOKEY(x)
+		KEY_EXPAND_ELT(rk0C_0F);
+		rk0C_0F ^= rk08_0B;
+		x ^= rk0C_0F;
+		AES_ROUND_NOKEY(x)
+		pC_F ^= x;
+		KEY_EXPAND_ELT(rk10_13);
+		rk10_13 ^= rk0C_0F;
+		x = p8_B ^ rk10_13;
+		AES_ROUND_NOKEY(x)
+		KEY_EXPAND_ELT(rk14_17);
+		rk14_17 ^= rk10_13;
+		x ^= rk14_17;
+		AES_ROUND_NOKEY(x)
+		KEY_EXPAND_ELT(rk18_1B);
+		rk18_1B ^= rk14_17;
+		x ^= rk18_1B;
+		AES_ROUND_NOKEY(x)
+		KEY_EXPAND_ELT(rk1C_1F);
+		rk1C_1F ^= rk18_1B;
 		if (r == 2) {
-			rk1E ^= 512;
-			rk1F ^= 0xffffffff;
+			rk1C_1F.s2 ^= 512;
+			rk1C_1F.s3 ^= 0xffffffff;
 		}
-		x0 ^= rk1C;
-		x1 ^= rk1D;
-		x2 ^= rk1E;
-		x3 ^= rk1F;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		p4 ^= x0;
-		p5 ^= x1;
-		p6 ^= x2;
-		p7 ^= x3;
+		x ^= rk1C_1F;
+		AES_ROUND_NOKEY(x)
+		p4_7 ^= x;
 		/* round 2, 6, 10 */
-		rk00 ^= rk19;
-		x0 = pC ^ rk00;
-		rk01 ^= rk1A;
-		x1 = pD ^ rk01;
-		rk02 ^= rk1B;
-		x2 = pE ^ rk02;
-		rk03 ^= rk1C;
-		x3 = pF ^ rk03;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		rk04 ^= rk1D;
-		x0 ^= rk04;
-		rk05 ^= rk1E;
-		x1 ^= rk05;
-		rk06 ^= rk1F;
-		x2 ^= rk06;
-		rk07 ^= rk00;
-		x3 ^= rk07;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		rk08 ^= rk01;
-		x0 ^= rk08;
-		rk09 ^= rk02;
-		x1 ^= rk09;
-		rk0A ^= rk03;
-		x2 ^= rk0A;
-		rk0B ^= rk04;
-		x3 ^= rk0B;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		rk0C ^= rk05;
-		x0 ^= rk0C;
-		rk0D ^= rk06;
-		x1 ^= rk0D;
-		rk0E ^= rk07;
-		x2 ^= rk0E;
-		rk0F ^= rk08;
-		x3 ^= rk0F;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		p8 ^= x0;
-		p9 ^= x1;
-		pA ^= x2;
-		pB ^= x3;
-		rk10 ^= rk09;
-		x0 = p4 ^ rk10;
-		rk11 ^= rk0A;
-		x1 = p5 ^ rk11;
-		rk12 ^= rk0B;
-		x2 = p6 ^ rk12;
-		rk13 ^= rk0C;
-		x3 = p7 ^ rk13;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		rk14 ^= rk0D;
-		x0 ^= rk14;
-		rk15 ^= rk0E;
-		x1 ^= rk15;
-		rk16 ^= rk0F;
-		x2 ^= rk16;
-		rk17 ^= rk10;
-		x3 ^= rk17;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		rk18 ^= rk11;
-		x0 ^= rk18;
-		rk19 ^= rk12;
-		x1 ^= rk19;
-		rk1A ^= rk13;
-		x2 ^= rk1A;
-		rk1B ^= rk14;
-		x3 ^= rk1B;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		rk1C ^= rk15;
-		x0 ^= rk1C;
-		rk1D ^= rk16;
-		x1 ^= rk1D;
-		rk1E ^= rk17;
-		x2 ^= rk1E;
-		rk1F ^= rk18;
-		x3 ^= rk1F;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		p0 ^= x0;
-		p1 ^= x1;
-		p2 ^= x2;
-		p3 ^= x3;
+		rk00_03.s0 ^= rk18_1B.s1;
+		rk00_03.s1 ^= rk18_1B.s2;
+		rk00_03.s2 ^= rk18_1B.s3;
+		rk00_03.s3 ^= rk1C_1F.s0;
+		x = pC_F ^ rk00_03;
+		AES_ROUND_NOKEY(x)
+		rk04_07.s0 ^= rk1C_1F.s1;
+		rk04_07.s1 ^= rk1C_1F.s2;
+		rk04_07.s2 ^= rk1C_1F.s3;
+		rk04_07.s3 ^= rk00_03.s0;
+		x ^= rk04_07;
+		AES_ROUND_NOKEY(x)
+		rk08_0B.s0 ^= rk00_03.s1;
+		rk08_0B.s1 ^= rk00_03.s2;
+		rk08_0B.s2 ^= rk00_03.s3;
+		rk08_0B.s3 ^= rk04_07.s0;
+		x ^= rk08_0B;
+		AES_ROUND_NOKEY(x)
+		rk0C_0F.s0 ^= rk04_07.s1;
+		rk0C_0F.s1 ^= rk04_07.s2;
+		rk0C_0F.s2 ^= rk04_07.s3;
+		rk0C_0F.s3 ^= rk08_0B.s0;
+		x ^= rk0C_0F;
+		AES_ROUND_NOKEY(x)
+		p8_B ^= x;
+		rk10_13.s0 ^= rk08_0B.s1;
+		rk10_13.s1 ^= rk08_0B.s2;
+		rk10_13.s2 ^= rk08_0B.s3;
+		rk10_13.s3 ^= rk0C_0F.s0;
+		x = p4_7 ^ rk10_13;
+		AES_ROUND_NOKEY(x)
+		rk14_17.s0 ^= rk0C_0F.s1;
+		rk14_17.s1 ^= rk0C_0F.s2;
+		rk14_17.s2 ^= rk0C_0F.s3;
+		rk14_17.s3 ^= rk10_13.s0;
+		x ^= rk14_17;
+		AES_ROUND_NOKEY(x)
+		rk18_1B.s0 ^= rk10_13.s1;
+		rk18_1B.s1 ^= rk10_13.s2;
+		rk18_1B.s2 ^= rk10_13.s3;
+		rk18_1B.s3 ^= rk14_17.s0;
+		x ^= rk18_1B;
+		AES_ROUND_NOKEY(x)
+		rk1C_1F.s0 ^= rk14_17.s1;
+		rk1C_1F.s1 ^= rk14_17.s2;
+		rk1C_1F.s2 ^= rk14_17.s3;
+		rk1C_1F.s3 ^= rk18_1B.s0;
+		x ^= rk1C_1F;
+		AES_ROUND_NOKEY(x)
+		p0_3 ^= x;
 		/* round 3, 7, 11 */
-		KEY_EXPAND_ELT(rk00, rk01, rk02, rk03);
-		rk00 ^= rk1C;
-		rk01 ^= rk1D;
-		rk02 ^= rk1E;
-		rk03 ^= rk1F;
-		x0 = p8 ^ rk00;
-		x1 = p9 ^ rk01;
-		x2 = pA ^ rk02;
-		x3 = pB ^ rk03;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		KEY_EXPAND_ELT(rk04, rk05, rk06, rk07);
-		rk04 ^= rk00;
-		rk05 ^= rk01;
-		rk06 ^= rk02;
-		rk07 ^= rk03;
-		x0 ^= rk04;
-		x1 ^= rk05;
-		x2 ^= rk06;
-		x3 ^= rk07;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		KEY_EXPAND_ELT(rk08, rk09, rk0A, rk0B);
-		rk08 ^= rk04;
-		rk09 ^= rk05;
-		rk0A ^= rk06;
-		rk0B ^= rk07;
-		x0 ^= rk08;
-		x1 ^= rk09;
-		x2 ^= rk0A;
-		x3 ^= rk0B;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		KEY_EXPAND_ELT(rk0C, rk0D, rk0E, rk0F);
-		rk0C ^= rk08;
-		rk0D ^= rk09;
-		rk0E ^= rk0A;
-		rk0F ^= rk0B;
-		x0 ^= rk0C;
-		x1 ^= rk0D;
-		x2 ^= rk0E;
-		x3 ^= rk0F;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		p4 ^= x0;
-		p5 ^= x1;
-		p6 ^= x2;
-		p7 ^= x3;
-		KEY_EXPAND_ELT(rk10, rk11, rk12, rk13);
-		rk10 ^= rk0C;
-		rk11 ^= rk0D;
-		rk12 ^= rk0E;
-		rk13 ^= rk0F;
-		x0 = p0 ^ rk10;
-		x1 = p1 ^ rk11;
-		x2 = p2 ^ rk12;
-		x3 = p3 ^ rk13;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		KEY_EXPAND_ELT(rk14, rk15, rk16, rk17);
-		rk14 ^= rk10;
-		rk15 ^= rk11;
-		rk16 ^= rk12;
-		rk17 ^= rk13;
-		x0 ^= rk14;
-		x1 ^= rk15;
-		x2 ^= rk16;
-		x3 ^= rk17;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		KEY_EXPAND_ELT(rk18, rk19, rk1A, rk1B);
-		rk18 ^= rk14;
-		rk19 ^= rk15;
-		rk1A ^= rk16;
-		rk1B ^= rk17;
-		x0 ^= rk18;
-		x1 ^= rk19;
-		x2 ^= rk1A;
-		x3 ^= rk1B;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		KEY_EXPAND_ELT(rk1C, rk1D, rk1E, rk1F);
-		rk1C ^= rk18;
-		rk1D ^= rk19;
-		rk1E ^= rk1A;
-		rk1F ^= rk1B;
-		x0 ^= rk1C;
-		x1 ^= rk1D;
-		x2 ^= rk1E;
-		x3 ^= rk1F;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		pC ^= x0;
-		pD ^= x1;
-		pE ^= x2;
-		pF ^= x3;
+		KEY_EXPAND_ELT(rk00_03);
+		rk00_03 ^= rk1C_1F;
+		x = p8_B ^ rk00_03;
+		AES_ROUND_NOKEY(x)
+		KEY_EXPAND_ELT(rk04_07);
+		rk04_07 ^= rk00_03;
+		x ^= rk04_07;
+		AES_ROUND_NOKEY(x)
+		KEY_EXPAND_ELT(rk08_0B);
+		rk08_0B ^= rk04_07;
+		x ^= rk08_0B;
+		AES_ROUND_NOKEY(x)
+		KEY_EXPAND_ELT(rk0C_0F);
+		rk0C_0F ^= rk08_0B;
+		x ^= rk0C_0F;
+		AES_ROUND_NOKEY(x)
+		p4_7 ^= x;
+		KEY_EXPAND_ELT(rk10_13);
+		rk10_13 ^= rk0C_0F;
+		x = p0_3 ^ rk10_13;
+		AES_ROUND_NOKEY(x)
+		KEY_EXPAND_ELT(rk14_17);
+		rk14_17 ^= rk10_13;
+		x ^= rk14_17;
+		AES_ROUND_NOKEY(x)
+		KEY_EXPAND_ELT(rk18_1B);
+		rk18_1B ^= rk14_17;
+		x ^= rk18_1B;
+		AES_ROUND_NOKEY(x)
+		KEY_EXPAND_ELT(rk1C_1F);
+		rk1C_1F ^= rk18_1B;
+		x ^= rk1C_1F;
+		AES_ROUND_NOKEY(x)
+		pC_F ^= x;
 		/* round 4, 8, 12 */
-		rk00 ^= rk19;
-		x0 = p4 ^ rk00;
-		rk01 ^= rk1A;
-		x1 = p5 ^ rk01;
-		rk02 ^= rk1B;
-		x2 = p6 ^ rk02;
-		rk03 ^= rk1C;
-		x3 = p7 ^ rk03;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		rk04 ^= rk1D;
-		x0 ^= rk04;
-		rk05 ^= rk1E;
-		x1 ^= rk05;
-		rk06 ^= rk1F;
-		x2 ^= rk06;
-		rk07 ^= rk00;
-		x3 ^= rk07;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		rk08 ^= rk01;
-		x0 ^= rk08;
-		rk09 ^= rk02;
-		x1 ^= rk09;
-		rk0A ^= rk03;
-		x2 ^= rk0A;
-		rk0B ^= rk04;
-		x3 ^= rk0B;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		rk0C ^= rk05;
-		x0 ^= rk0C;
-		rk0D ^= rk06;
-		x1 ^= rk0D;
-		rk0E ^= rk07;
-		x2 ^= rk0E;
-		rk0F ^= rk08;
-		x3 ^= rk0F;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		p0 ^= x0;
-		p1 ^= x1;
-		p2 ^= x2;
-		p3 ^= x3;
-		rk10 ^= rk09;
-		x0 = pC ^ rk10;
-		rk11 ^= rk0A;
-		x1 = pD ^ rk11;
-		rk12 ^= rk0B;
-		x2 = pE ^ rk12;
-		rk13 ^= rk0C;
-		x3 = pF ^ rk13;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		rk14 ^= rk0D;
-		x0 ^= rk14;
-		rk15 ^= rk0E;
-		x1 ^= rk15;
-		rk16 ^= rk0F;
-		x2 ^= rk16;
-		rk17 ^= rk10;
-		x3 ^= rk17;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		rk18 ^= rk11;
-		x0 ^= rk18;
-		rk19 ^= rk12;
-		x1 ^= rk19;
-		rk1A ^= rk13;
-		x2 ^= rk1A;
-		rk1B ^= rk14;
-		x3 ^= rk1B;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		rk1C ^= rk15;
-		x0 ^= rk1C;
-		rk1D ^= rk16;
-		x1 ^= rk1D;
-		rk1E ^= rk17;
-		x2 ^= rk1E;
-		rk1F ^= rk18;
-		x3 ^= rk1F;
-		AES_ROUND_NOKEY(x0, x1, x2, x3);
-		p8 ^= x0;
-		p9 ^= x1;
-		pA ^= x2;
-		pB ^= x3;
+		rk00_03.s0 ^= rk18_1B.s1;
+		rk00_03.s1 ^= rk18_1B.s2;
+		rk00_03.s2 ^= rk18_1B.s3;
+		rk00_03.s3 ^= rk1C_1F.s0;
+		x = p4_7 ^ rk00_03;
+		AES_ROUND_NOKEY(x)
+		rk04_07.s0 ^= rk1C_1F.s1;
+		rk04_07.s1 ^= rk1C_1F.s2;
+		rk04_07.s2 ^= rk1C_1F.s3;
+		rk04_07.s3 ^= rk00_03.s0;
+		x ^= rk04_07;
+		AES_ROUND_NOKEY(x)
+		rk08_0B.s0 ^= rk00_03.s1;
+		rk08_0B.s1 ^= rk00_03.s2;
+		rk08_0B.s2 ^= rk00_03.s3;
+		rk08_0B.s3 ^= rk04_07.s0;
+		x ^= rk08_0B;
+		AES_ROUND_NOKEY(x)
+		rk0C_0F.s0 ^= rk04_07.s1;
+		rk0C_0F.s1 ^= rk04_07.s2;
+		rk0C_0F.s2 ^= rk04_07.s3;
+		rk0C_0F.s3 ^= rk08_0B.s0;
+		x ^= rk0C_0F;
+		AES_ROUND_NOKEY(x)
+		p0_3 ^= x;
+		rk10_13.s0 ^= rk08_0B.s1;
+		rk10_13.s1 ^= rk08_0B.s2;
+		rk10_13.s2 ^= rk08_0B.s3;
+		rk10_13.s3 ^= rk0C_0F.s0;
+		x = pC_F ^ rk10_13;
+		AES_ROUND_NOKEY(x)
+		rk14_17.s0 ^= rk0C_0F.s1;
+		rk14_17.s1 ^= rk0C_0F.s2;
+		rk14_17.s2 ^= rk0C_0F.s3;
+		rk14_17.s3 ^= rk10_13.s0;
+		x ^= rk14_17;
+		AES_ROUND_NOKEY(x)
+		rk18_1B.s0 ^= rk10_13.s1;
+		rk18_1B.s1 ^= rk10_13.s2;
+		rk18_1B.s2 ^= rk10_13.s3;
+		rk18_1B.s3 ^= rk14_17.s0;
+		x ^= rk18_1B;
+		AES_ROUND_NOKEY(x)
+		rk1C_1F.s0 ^= rk14_17.s1;
+		rk1C_1F.s1 ^= rk14_17.s2;
+		rk1C_1F.s2 ^= rk14_17.s3;
+		rk1C_1F.s3 ^= rk18_1B.s0;
+		x ^= rk1C_1F;
+		AES_ROUND_NOKEY(x)
+		p8_B ^= x;
 	}
 	/* round 13 */
-	KEY_EXPAND_ELT(rk00, rk01, rk02, rk03);
-	rk00 ^= rk1C;
-	rk01 ^= rk1D;
-	rk02 ^= rk1E;
-	rk03 ^= rk1F;
-	x0 = p0 ^ rk00;
-	x1 = p1 ^ rk01;
-	x2 = p2 ^ rk02;
-	x3 = p3 ^ rk03;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	KEY_EXPAND_ELT(rk04, rk05, rk06, rk07);
-	rk04 ^= rk00;
-	rk05 ^= rk01;
-	rk06 ^= rk02;
-	rk07 ^= rk03;
-	x0 ^= rk04;
-	x1 ^= rk05;
-	x2 ^= rk06;
-	x3 ^= rk07;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	KEY_EXPAND_ELT(rk08, rk09, rk0A, rk0B);
-	rk08 ^= rk04;
-	rk09 ^= rk05;
-	rk0A ^= rk06;
-	rk0B ^= rk07;
-	x0 ^= rk08;
-	x1 ^= rk09;
-	x2 ^= rk0A;
-	x3 ^= rk0B;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	KEY_EXPAND_ELT(rk0C, rk0D, rk0E, rk0F);
-	rk0C ^= rk08;
-	rk0D ^= rk09;
-	rk0E ^= rk0A;
-	rk0F ^= rk0B;
-	x0 ^= rk0C;
-	x1 ^= rk0D;
-	x2 ^= rk0E;
-	x3 ^= rk0F;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	pC ^= x0;
-	pD ^= x1;
-	pE ^= x2;
-	pF ^= x3;
-	KEY_EXPAND_ELT(rk10, rk11, rk12, rk13);
-	rk10 ^= rk0C;
-	rk11 ^= rk0D;
-	rk12 ^= rk0E;
-	rk13 ^= rk0F;
-	x0 = p8 ^ rk10;
-	x1 = p9 ^ rk11;
-	x2 = pA ^ rk12;
-	x3 = pB ^ rk13;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	KEY_EXPAND_ELT(rk14, rk15, rk16, rk17);
-	rk14 ^= rk10;
-	rk15 ^= rk11;
-	rk16 ^= rk12;
-	rk17 ^= rk13;
-	x0 ^= rk14;
-	x1 ^= rk15;
-	x2 ^= rk16;
-	x3 ^= rk17;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	KEY_EXPAND_ELT(rk18, rk19, rk1A, rk1B);
-	rk18 ^= rk14;
-	rk19 ^= rk15 ^ 512;
-	rk1A ^= rk16;
-	rk1B ^= rk17 ^ 0xffffffff;
-	x0 ^= rk18;
-	x1 ^= rk19;
-	x2 ^= rk1A;
-	x3 ^= rk1B;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	KEY_EXPAND_ELT(rk1C, rk1D, rk1E, rk1F);
-	rk1C ^= rk18;
-	rk1D ^= rk19;
-	rk1E ^= rk1A;
-	rk1F ^= rk1B;
-	x0 ^= rk1C;
-	x1 ^= rk1D;
-	x2 ^= rk1E;
-	x3 ^= rk1F;
-	AES_ROUND_NOKEY(x0, x1, x2, x3);
-	p4 ^= x0;
-	p5 ^= x1;
-	p6 ^= x2;
-	p7 ^= x3;
-	sc->h[0x0] ^= p8;
-	sc->h[0x1] ^= p9;
-	sc->h[0x2] ^= pA;
-	sc->h[0x3] ^= pB;
-	sc->h[0x4] ^= pC;
-	sc->h[0x5] ^= pD;
-	sc->h[0x6] ^= pE;
-	sc->h[0x7] ^= pF;
-	sc->h[0x8] ^= p0;
-	sc->h[0x9] ^= p1;
-	sc->h[0xA] ^= p2;
-	sc->h[0xB] ^= p3;
-	sc->h[0xC] ^= p4;
-	sc->h[0xD] ^= p5;
-	sc->h[0xE] ^= p6;
-	sc->h[0xF] ^= p7;
+	KEY_EXPAND_ELT(rk00_03);
+	rk00_03 ^= rk1C_1F;
+	x = p0_3 ^ rk00_03;
+	AES_ROUND_NOKEY(x)
+	KEY_EXPAND_ELT(rk04_07);
+	rk04_07 ^= rk00_03;
+	x ^= rk04_07;
+	AES_ROUND_NOKEY(x)
+	KEY_EXPAND_ELT(rk08_0B);
+	rk08_0B ^= rk04_07;
+	x ^= rk08_0B;
+	AES_ROUND_NOKEY(x)
+	KEY_EXPAND_ELT(rk0C_0F);
+	rk0C_0F ^= rk08_0B;
+	x ^= rk0C_0F;
+	AES_ROUND_NOKEY(x)
+	pC_F ^= x;
+	KEY_EXPAND_ELT(rk10_13);
+	rk10_13 ^= rk0C_0F;
+	x = p8_B ^ rk10_13;
+	AES_ROUND_NOKEY(x)
+	KEY_EXPAND_ELT(rk14_17);
+	rk14_17 ^= rk10_13;
+	x ^= rk14_17;
+	AES_ROUND_NOKEY(x)
+	KEY_EXPAND_ELT(rk18_1B);
+	rk18_1B.s0 ^= rk14_17.s0;
+	rk18_1B.s1 ^= rk14_17.s1 ^ 512;
+	rk18_1B.s2 ^= rk14_17.s2;
+	rk18_1B.s3 ^= rk14_17.s3 ^ 0xffffffff;
+	x ^= rk18_1B;
+	AES_ROUND_NOKEY(x)
+	KEY_EXPAND_ELT(rk1C_1F);
+	rk1C_1F ^= rk18_1B;
+	x ^= rk1C_1F;
+	AES_ROUND_NOKEY(x)
+	p4_7 ^= x;
+	sc->h[0x0] ^= p8_B.s0;
+	sc->h[0x1] ^= p8_B.s1;
+	sc->h[0x2] ^= p8_B.s2;
+	sc->h[0x3] ^= p8_B.s3;
+	sc->h[0x4] ^= pC_F.s0;
+	sc->h[0x5] ^= pC_F.s1;
+	sc->h[0x6] ^= pC_F.s2;
+	sc->h[0x7] ^= pC_F.s3;
+	sc->h[0x8] ^= p0_3.s0;
+	sc->h[0x9] ^= p0_3.s1;
+	sc->h[0xA] ^= p0_3.s2;
+	sc->h[0xB] ^= p0_3.s3;
+	sc->h[0xC] ^= p4_7.s0;
+	sc->h[0xD] ^= p4_7.s1;
+	sc->h[0xE] ^= p4_7.s2;
+	sc->h[0xF] ^= p4_7.s3;
 }
 
 
@@ -935,14 +685,6 @@ shavite_core_64(shavite_context *sc, const void *data)
 	((ulong8*)sc->buf)[1] = 0;
 }
 
-//void
-//enc32le(void *dst, uint val)
-//{
-//	((unsigned char *)dst)[0] = val;
-//	((unsigned char *)dst)[1] = (val >> 8);
-//	((unsigned char *)dst)[2] = (val >> 16);
-//	((unsigned char *)dst)[3] = (val >> 24);
-//}
 
 #define enc32le(dst, val) (*((uint*)(dst)) = (val))
 
@@ -961,17 +703,4 @@ shavite_close(shavite_context *sc, void *dst)
 	#pragma unroll
 	for (int u = 0; u < 16; u ++)
 		enc32le((unsigned char *)dst + (u << 2), sc->h[u]);
-}
-
-
-kernel void shavite512(global ulong * in, global ulong * out) {
-	shavite_context ctx;
-	ulong data[8];
-	ulong hash[8];
-
-	shavite_init(&ctx);
-	for (int i = 0; i < 8; i++) data[i] = in[i];
-	shavite_core_64(&ctx, data);
-	shavite_close(&ctx, hash);
-	for (int i = 0; i < 8; i++) out[i] = hash[i];
 }
