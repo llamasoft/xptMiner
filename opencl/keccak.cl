@@ -28,6 +28,8 @@ constant ulong RC[] = {
 	SPH_C64(0x0000000080000001), SPH_C64(0x8000000080008008)
 };
 
+#ifdef SPH_KECCAK_NOCOPY
+
 #define a00   (kc->u.wide[ 0])
 #define a10   (kc->u.wide[ 1])
 #define a20   (kc->u.wide[ 2])
@@ -53,6 +55,96 @@ constant ulong RC[] = {
 #define a24   (kc->u.wide[22])
 #define a34   (kc->u.wide[23])
 #define a44   (kc->u.wide[24])
+
+#define DECL_STATE
+#define READ_STATE(sc)
+#define WRITE_STATE(sc)
+
+#define INPUT_BUF72   do { \
+        #pragma unroll \
+		for (size_t j = 0; j < (size); j += 8) { \
+			kc->u.wide[j >> 3] ^= (*((ulong*)(buf + j))); \
+		} \
+	} while (0)
+
+#else
+
+#define DECL_STATE \
+	ulong a00, a01, a02, a03, a04; \
+	ulong a10, a11, a12, a13, a14; \
+	ulong a20, a21, a22, a23, a24; \
+	ulong a30, a31, a32, a33, a34; \
+	ulong a40, a41, a42, a43, a44;
+
+#define READ_STATE(state)   do { \
+		a00 = (state)->u.wide[ 0]; \
+		a10 = (state)->u.wide[ 1]; \
+		a20 = (state)->u.wide[ 2]; \
+		a30 = (state)->u.wide[ 3]; \
+		a40 = (state)->u.wide[ 4]; \
+		a01 = (state)->u.wide[ 5]; \
+		a11 = (state)->u.wide[ 6]; \
+		a21 = (state)->u.wide[ 7]; \
+		a31 = (state)->u.wide[ 8]; \
+		a41 = (state)->u.wide[ 9]; \
+		a02 = (state)->u.wide[10]; \
+		a12 = (state)->u.wide[11]; \
+		a22 = (state)->u.wide[12]; \
+		a32 = (state)->u.wide[13]; \
+		a42 = (state)->u.wide[14]; \
+		a03 = (state)->u.wide[15]; \
+		a13 = (state)->u.wide[16]; \
+		a23 = (state)->u.wide[17]; \
+		a33 = (state)->u.wide[18]; \
+		a43 = (state)->u.wide[19]; \
+		a04 = (state)->u.wide[20]; \
+		a14 = (state)->u.wide[21]; \
+		a24 = (state)->u.wide[22]; \
+		a34 = (state)->u.wide[23]; \
+		a44 = (state)->u.wide[24]; \
+	} while (0)
+
+#define WRITE_STATE(state)   do { \
+		(state)->u.wide[ 0] = a00; \
+		(state)->u.wide[ 1] = a10; \
+		(state)->u.wide[ 2] = a20; \
+		(state)->u.wide[ 3] = a30; \
+		(state)->u.wide[ 4] = a40; \
+		(state)->u.wide[ 5] = a01; \
+		(state)->u.wide[ 6] = a11; \
+		(state)->u.wide[ 7] = a21; \
+		(state)->u.wide[ 8] = a31; \
+		(state)->u.wide[ 9] = a41; \
+		(state)->u.wide[10] = a02; \
+		(state)->u.wide[11] = a12; \
+		(state)->u.wide[12] = a22; \
+		(state)->u.wide[13] = a32; \
+		(state)->u.wide[14] = a42; \
+		(state)->u.wide[15] = a03; \
+		(state)->u.wide[16] = a13; \
+		(state)->u.wide[17] = a23; \
+		(state)->u.wide[18] = a33; \
+		(state)->u.wide[19] = a43; \
+		(state)->u.wide[20] = a04; \
+		(state)->u.wide[21] = a14; \
+		(state)->u.wide[22] = a24; \
+		(state)->u.wide[23] = a34; \
+		(state)->u.wide[24] = a44; \
+	} while (0)
+
+#define INPUT_BUF72   do { \
+		a00 ^= (*((ulong*)(buf +   0))); \
+		a10 ^= (*((ulong*)(buf +   8))); \
+		a20 ^= (*((ulong*)(buf +  16))); \
+		a30 ^= (*((ulong*)(buf +  24))); \
+		a40 ^= (*((ulong*)(buf +  32))); \
+		a01 ^= (*((ulong*)(buf +  40))); \
+		a11 ^= (*((ulong*)(buf +  48))); \
+		a21 ^= (*((ulong*)(buf +  56))); \
+		a31 ^= (*((ulong*)(buf +  64))); \
+	} while (0)
+#endif
+
 
 ulong
 dec64le_aligned(const void *src)
@@ -84,20 +176,9 @@ dec64le_aligned(const void *src)
 
 #define enc64le_aligned(dst, val) (*((ulong*)(dst)) = (val))
 
-#define INPUT_BUF(size)   { \
-		size_t j; \
-		for (j = 0; j < (size); j += 8) { \
-			kc->u.wide[j >> 3] ^= dec64le_aligned(buf + j); \
-		} \
-	}
-
 #define SPH_T64(x)    ((x) & SPH_C64(0xFFFFFFFFFFFFFFFF))
 #define SPH_ROTL64(x, n)   SPH_T64(((x) << (n)) | ((x) >> (64 - (n))))
 #define SPH_ROTR64(x, n)   SPH_ROTL64(x, (64 - (n)))
-#define INPUT_BUF144   INPUT_BUF(144)
-#define INPUT_BUF136   INPUT_BUF(136)
-#define INPUT_BUF104   INPUT_BUF(104)
-#define INPUT_BUF72    INPUT_BUF(72)
 #define DECL64(x)        ulong x
 #define MOV64(d, s)      (d = s)
 #define XOR64(d, a, b)   (d = a ^ b)
@@ -170,7 +251,6 @@ dec64le_aligned(const void *src)
 	b20, b21, b22, b23, b24, b30, b31, b32, b33, b34, \
 	b40, b41, b42, b43, b44) \
 	{ \
-		/* ROL64(b00, b00,  0); */ \
 		ROL64(b01, b01, 36); \
 		ROL64(b02, b02,  3); \
 		ROL64(b03, b03, 41); \
@@ -357,6 +437,7 @@ keccak_init(keccak_context *kc)
 	kc->lim = 200 - (512 >> 2);
 }
 
+
 void keccak_core_80(keccak_context *kc, const void *data)
 {
 	unsigned char *buf;
@@ -374,18 +455,19 @@ void keccak_core_80(keccak_context *kc, const void *data)
 	}
 #pragma unroll
 	for (int j = 0; j < 24; j ++) {
-		KF_ELT01(RC[j + 0]);
-		P1_TO_P0;
+        // Syntax errors due to NOCOPY macro
+		//KF_ELT01(RC[j + 0]);
+		//P1_TO_P0;
 	}
 
 	*((uchar8*)buf) = *((uchar8*)data);
 	kc->ptr = 8;
 }
 
+
 void keccak_core_end_64_8(keccak_context *kc, const void *data)
 {
 	unsigned char *buf;
-
 	buf = kc->buf;
 
 	buf[8] = 1;
@@ -393,15 +475,20 @@ void keccak_core_end_64_8(keccak_context *kc, const void *data)
 	for (int i = 9; i < 71; i++) buf[i] = 0;
 	buf[71] = 0x80;
 
-#pragma unroll
-	for (size_t j = 0; j < (72); j += 8) {
-		kc->u.wide[j >> 3] ^= (*((ulong*)(buf + j)));
-	}
+    DECL_STATE;
+    READ_STATE(kc);
+	INPUT_BUF72;
+    
 #pragma unroll
 	for (int j = 0; j < 24; j ++) {
-		KF_ELT01(RC[j + 0]);
+		THETA ( a00, a01, a02, a03, a04, a10, a11, a12, a13, a14, a20, a21, a22, a23, a24, a30, a31, a32, a33, a34, a40, a41, a42, a43, a44 );
+		  RHO ( a00, a01, a02, a03, a04, a10, a11, a12, a13, a14, a20, a21, a22, a23, a24, a30, a31, a32, a33, a34, a40, a41, a42, a43, a44 );
+		  KHI ( a00, a30, a10, a40, a20, a11, a41, a21, a01, a31, a22, a02, a32, a12, a42, a33, a13, a43, a23, a03, a44, a24, a04, a34, a14 );
+		IOTA(RC[j + 0]);
+		//KF_ELT01(RC[j + 0]);
 		P1_TO_P0;
 	}
+    WRITE_STATE(kc);
 }
 
 // d = 64, lim = 72, ub = 0. n = 0

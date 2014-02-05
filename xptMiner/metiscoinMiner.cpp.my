@@ -1,0 +1,110 @@
+#include"global.h"
+#include "OpenCLObjects.h"
+#include "ticker.h"
+#include "metiscoinMiner.h"
+
+#define HASHES_PER_WORKER	0x04
+#define JOBS_PER_PASS		0x80000
+#define TOTAL_WORK_PER_PASS ( HASHES_PER_WORKER * JOBS_PER_PASS )
+// assert(MAX_NONCE % TOTAL_WORK_PER_PASS == 0)
+
+#define MAX_NONCE 0x8000000
+#define STEP_MULTIPLIER 0x10000
+
+MetiscoinOpenCL::MetiscoinOpenCL(int _device_num) {
+	this->device_num = _device_num;
+	printf("Initializing GPU %d\n", device_num);
+	OpenCLMain &main = OpenCLMain::getInstance();
+	OpenCLDevice* device = main.getDevice(device_num);
+	printf("Initializing Device: %s\n", device->getName().c_str());
+
+//	std::vector<std::string> files_metis;
+//	files_metis.push_back("opencl/metis.cl");
+//	OpenCLProgram* program_metis = main.getDevice(device_num)->getContext()->loadProgramFromFiles(files_metis);
+//	OpenCLKernel* kernel_metis = program_metis->getKernel("metis512");
+//
+//	std::vector<std::string> files_shavite;
+//	files_shavite.push_back("opencl/shavite.cl");
+//	OpenCLProgram* program_shavite = main.getDevice(device_num)->getContext()->loadProgramFromFiles(files_shavite);
+//	OpenCLKernel* kernel_shavite = program_shavite->getKernel("shavite512");
+
+	printf("Compiling OpenCL code... this may take 3-5 minutes\n");
+	std::vector<std::string> files_keccak;
+	files_keccak.push_back("opencl/keccak.cl");
+	files_keccak.push_back("opencl/shavite.cl");
+	files_keccak.push_back("opencl/metis.cl");
+	files_keccak.push_back("opencl/miner.cl");
+	OpenCLProgram* program = device->getContext()->loadProgramFromFiles(files_keccak);
+	kernel_all = program->getKernel("metiscoin_process");
+	main.listDevices();
+
+	u = device->getContext()->createBuffer(25*sizeof(cl_ulong), CL_MEM_READ_WRITE, NULL);
+	buff = device->getContext()->createBuffer(4, CL_MEM_READ_WRITE, NULL);
+	out = device->getContext()->createBuffer(sizeof(cl_uint) * 255, CL_MEM_READ_WRITE, NULL);
+	out_count = device->getContext()->createBuffer(sizeof(cl_uint), CL_MEM_READ_WRITE, NULL);
+	q = device->getContext()->createCommandQueue(device);
+}
+
+static inline cl_uint my_swap32(cl_uint x)
+{
+  return ((((x)&    0xFF)<<24) | (((x)&    0xFF00)<<8) | \
+	  (((x)&0xFF0000)>> 8) | (((x)&0xFF000000)>>24));
+}
+
+void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
+{
+	block->nonce = 0;
+	uint32 target = *(uint32*)(block->targetShare+28);
+	uint32 hashes_per_worker = HASHES_PER_WORKER;
+	OpenCLDevice* device = OpenCLMain::getInstance().getDevice(device_num);
+	//printf("processing block with Device: %s\n", device->getName().c_str());
+
+
+	// measure time
+	uint32 cur_nonce = 0;
+	while (cur_nonce < MAX_NONCE)
+	{
+		if( block->height != monitorCurrentBlockHeight ) { break; }
+
+		// Define the argument layout
+		kernel_all->resetArgs();
+		kernel_all->addGlobalArg(u);
+		kernel_all->addGlobalArg(buff);
+		kernel_all->addGlobalArg(out);
+		kernel_all->addGlobalArg(out_count);
+		kernel_all->addScalarUInt(cur_nonce);
+		kernel_all->addScalarUInt(hashes_per_worker);
+		kernel_all->addScalarUInt(target);
+
+		// Pre-calculate the keccak state up to 80(?) bytes
+		sph_keccak512_context ctx_keccak;
+		sph_keccak512_init(&ctx_keccak);
+		sph_keccak512(&ctx_keccak, &block->version, 80);
+
+		// Load the hash context into the argument
+		cl_uint out_count_tmp = 0;
+		q->enqueueWriteBuffer(u,    ctx_keccak.u.wide, 25 * sizeof(cl_ulong));
+		q->enqueueWriteBuffer(buff, ctx_keccak.buf,    4);
+		q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
+
+		// Run the work load
+		q->enqueueKernel1D(kernel_all, JOBS_PER_PASS, kernel_all->getWorkGroupSize(device));
+
+		// Extract the results
+		q->enqueueReadBuffer(out, out_tmp, sizeof(cl_uint) * 255);
+		q->enqueueReadBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
+		q->finish();
+
+		// Submit any valid shares
+		for (int i = 0; i < out_count_tmp; i++) {
+			totalShareCount++;
+			block->nonce = out_tmp[i];
+			//printf("Found share with nonce = %d\n", block->nonce);
+			xptMiner_submitShare(block);
+		}
+
+		totalCollisionCount += TOTAL_WORK_PER_PASS;
+		cur_nonce += TOTAL_WORK_PER_PASS;
+	}
+
+}

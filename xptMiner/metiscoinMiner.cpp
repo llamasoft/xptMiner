@@ -3,27 +3,20 @@
 #include "ticker.h"
 #include "metiscoinMiner.h"
 
-#define STEP_SIZE 0x80000
-#define NUM_STEPS 0x100
-#define STEP_MULTIPLIER 0x10000
+//#define STEP_SIZE 0x80000
+//#define NUM_STEPS 0x100
+#define STEP_SIZE 0x100000
+#define NUM_STEPS 0x80
+//#define MEASURE_TIME 1
 
 MetiscoinOpenCL::MetiscoinOpenCL(int _device_num) {
 	this->device_num = _device_num;
 	printf("Initializing GPU %d\n", device_num);
 	OpenCLMain &main = OpenCLMain::getInstance();
 	OpenCLDevice* device = main.getDevice(device_num);
-	printf("Initializing Device: %s (this may take a while, please be patient)\n", device->getName().c_str());
+	printf("Initializing Device: %s\n", device->getName().c_str());
 
-//	std::vector<std::string> files_metis;
-//	files_metis.push_back("opencl/metis.cl");
-//	OpenCLProgram* program_metis = main.getDevice(device_num)->getContext()->loadProgramFromFiles(files_metis);
-//	OpenCLKernel* kernel_metis = program_metis->getKernel("metis512");
-//
-//	std::vector<std::string> files_shavite;
-//	files_shavite.push_back("opencl/shavite.cl");
-//	OpenCLProgram* program_shavite = main.getDevice(device_num)->getContext()->loadProgramFromFiles(files_shavite);
-//	OpenCLKernel* kernel_shavite = program_shavite->getKernel("shavite512");
-
+	printf("Compiling OpenCL code... this may take 3-5 minutes\n");
 	std::vector<std::string> files_keccak;
 	files_keccak.push_back("opencl/keccak.cl");
 	files_keccak.push_back("opencl/shavite.cl");

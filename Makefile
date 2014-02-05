@@ -1,6 +1,6 @@
 CXX = g++
 CC = cc
-CXXFLAGS = -Wall -Wextra -std=c++0x -O2 -fomit-frame-pointer 
+CXXFLAGS = -static -Wall -Wextra -std=c++0x -O2 -fomit-frame-pointer 
 
 OSVERSION := $(shell uname -s)
 
@@ -53,7 +53,7 @@ endif
 ifeq ($(OSVERSION),CYGWIN_NT-6.1)
 	EXTENSION = .exe
 	LIBS += -lOpenCL
-        LIBPATHS += -L/cygdrive/c/Program\ Files\ \(x86\)/AMD\ APP\ SDK/2.9/lib/x86
+        LIBPATHS += -L/cygdrive/c/Program\ Files\ \(x86\)/AMD\ APP\ SDK/2.9/lib/x86_64
 	INCLUDEPATHS += -I/cygdrive/c/Program\ Files\ \(x86\)/AMD\ APP\ SDK/2.9/include
 endif
 
