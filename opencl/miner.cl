@@ -35,13 +35,11 @@ kernel void metiscoin_process(constant  const   ulong*  u,
 
         // shavite
         shavite_init(&ctx_shavite);
-        shavite_core_64(&ctx_shavite, hash_temp);
-        shavite_close(&ctx_shavite, hash_temp);
+        // shavite_core_and_close(&ctx_shavite, hash_temp, hash_temp);
 
         // metis
         metis_init(&ctx_metis);
-        metis_core_64(&ctx_metis, hash_temp);
-        metis_close(&ctx_metis, hash_temp);
+        // metis_core_and_close(&ctx_metis, hash_temp, hash_temp);
 
         if( *(uint*)((uchar*)hash_temp+28) <= target )
         {
@@ -85,8 +83,14 @@ kernel void keccak_step_noinit(constant const ulong* u, constant const char* buf
 	}
 }
 
-kernel void shavite_step(global ulong* in_out) {
 
+kernel void shavite_step(global ulong* in_out,
+                         global uint*  AES0,
+                         global uint*  AES1,
+                         global uint*  AES2,
+                         global uint*  AES3
+                         )
+{
 	size_t id = get_global_id(0);
 
 	shavite_context	 ctx_shavite;
@@ -97,18 +101,45 @@ kernel void shavite_step(global ulong* in_out) {
 	for (int i = 0; i < 8; i++) {
 		hash0[i] = in_out[(id * 8)+i];
 	}
+    
+    // Copy global lookup table into local memory
+    size_t qty = 256;
+    local uint SHAVITE_LOOKUP0[256];
+    local uint SHAVITE_LOOKUP1[256];
+    local uint SHAVITE_LOOKUP2[256];
+    local uint SHAVITE_LOOKUP3[256];
+    event_t e[4];
+    e[0] = async_work_group_copy(SHAVITE_LOOKUP0, AES0, qty, 0);
+    e[1] = async_work_group_copy(SHAVITE_LOOKUP1, AES1, qty, 0);
+    e[2] = async_work_group_copy(SHAVITE_LOOKUP2, AES2, qty, 0);
+    e[3] = async_work_group_copy(SHAVITE_LOOKUP3, AES3, qty, 0);
+    wait_group_events(4, e);
 
 	shavite_init(&ctx_shavite);
-	shavite_core_64(&ctx_shavite, hash0);
-	shavite_close(&ctx_shavite, hash1);
+    shavite_core_64(&ctx_shavite, hash0);
+	shavite_close(&ctx_shavite, hash1,
+                  SHAVITE_LOOKUP0,
+                  SHAVITE_LOOKUP1,
+                  SHAVITE_LOOKUP2,
+                  SHAVITE_LOOKUP3
+                 );
 
 	for (int i = 0; i < 8; i++) {
 		in_out[(id * 8)+i] = hash1[i];
 	}
 }
 
-kernel void metis_step(global ulong* in, global uint* out, global uint* outcount, uint begin_nonce, uint target) {
-
+kernel void metis_step(global ulong* in,
+                       global uint*  out,
+                       global uint*  outcount,
+                              uint   begin_nonce,
+                              uint   target,
+                       global uint*  mixtab0,
+                       global uint*  mixtab1,
+                       global uint*  mixtab2,
+                       global uint*  mixtab3
+                       )
+{
 	size_t id = get_global_id(0);
 	uint nonce = (uint)id + begin_nonce;
 	uint hnonce = nonce / 0x8000;
@@ -124,15 +155,27 @@ kernel void metis_step(global ulong* in, global uint* out, global uint* outcount
 		hash0[i] = in[(id * 8)+i];
 	}
 
-	// metis
-	metis_init(&ctx_metis);
-	metis_core_64(&ctx_metis, hash0);
-	metis_close(&ctx_metis, hash1);
+    // Copy global lookup table into local memory
+    size_t qty = 256;
+    local uint METIS_LOOKUP0[256];
+    local uint METIS_LOOKUP1[256];
+    local uint METIS_LOOKUP2[256];
+    local uint METIS_LOOKUP3[256];
+    event_t e[4];
+    e[0] = async_work_group_copy(METIS_LOOKUP0, mixtab0, qty, 0);
+    e[1] = async_work_group_copy(METIS_LOOKUP1, mixtab1, qty, 0);
+    e[2] = async_work_group_copy(METIS_LOOKUP2, mixtab2, qty, 0);
+    e[3] = async_work_group_copy(METIS_LOOKUP3, mixtab3, qty, 0);
+    wait_group_events(4, e);
 
-	// for debug
-//	for (int i = 0; i < 8; i++) {
-//		in[(id * 8)+i] = hash1[i];
-//	}
+    
+    metis_init(&ctx_metis);
+    metis_core_and_close(&ctx_metis, hash0, hash1,
+                         METIS_LOOKUP0,
+                         METIS_LOOKUP1,
+                         METIS_LOOKUP2,
+                         METIS_LOOKUP3);
+
 
 	if( *(uint*)((uchar*)hash1+28) <= target )
 	{

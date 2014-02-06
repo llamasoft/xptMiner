@@ -1,13 +1,15 @@
-#include"global.h"
-#include "OpenCLObjects.h"
+#include "global.h"
 #include "ticker.h"
 #include "metiscoinMiner.h"
 
-//#define STEP_SIZE 0x80000
-//#define NUM_STEPS 0x100
-#define STEP_SIZE 0x100000
-#define NUM_STEPS 0x80
-//#define MEASURE_TIME 1
+// For copying lookup tables to OpenCL
+#include "sph_metis.h"
+#include "aes_helper.h"
+
+#define STEP_SIZE 0x80000
+#define NUM_STEPS 0x100
+// #define MEASURE_TIME 1
+
 
 MetiscoinOpenCL::MetiscoinOpenCL(int _device_num) {
 	this->device_num = _device_num;
@@ -40,14 +42,21 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num) {
 			64 * STEP_SIZE, CL_MEM_READ_WRITE, NULL);
 	out = device->getContext()->createBuffer(sizeof(cl_uint) * 255, CL_MEM_READ_WRITE, NULL);
 	out_count = device->getContext()->createBuffer(sizeof(cl_uint), CL_MEM_READ_WRITE, NULL);
+
+    metis_mixtab0 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)mixtab0);
+    metis_mixtab1 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)mixtab1);
+    metis_mixtab2 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)mixtab2);
+    metis_mixtab3 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)mixtab3);
+
+    shavite_AES0 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)AES0);
+    shavite_AES1 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)AES1);
+    shavite_AES2 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)AES2);
+    shavite_AES3 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)AES3);
+
+
 	q = device->getContext()->createCommandQueue(device);
 }
 
-static inline cl_uint my_swap32(cl_uint x)
-{
-  return ((((x)&    0xFF)<<24) | (((x)&    0xFF00)<<8) | \
-	  (((x)&0xFF0000)>> 8) | (((x)&0xFF000000)>>24));
-}
 
 void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 {
@@ -93,9 +102,12 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		// shavite
 		kernel_shavite->resetArgs();
 		kernel_shavite->addGlobalArg(hashes);
+        kernel_shavite->addGlobalArg(shavite_AES0);
+        kernel_shavite->addGlobalArg(shavite_AES1);
+        kernel_shavite->addGlobalArg(shavite_AES2);
+        kernel_shavite->addGlobalArg(shavite_AES3);
 
-		q->enqueueKernel1D(kernel_shavite, STEP_SIZE,
-				kernel_shavite->getWorkGroupSize(device));
+		q->enqueueKernel1D(kernel_shavite, STEP_SIZE, kernel_shavite->getWorkGroupSize(device));
 
 #ifdef MEASURE_TIME
 		printf("shavite work group size = %d\n", kernel_shavite->getWorkGroupSize(device));
@@ -103,7 +115,6 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		uint32 end_shavite = getTimeMilliseconds();
 #endif
 		// metis
-		// metis_step(global ulong* in, global uint* out, global uint* outcount, uint begin_nonce, uint target) {
 		kernel_metis->resetArgs();
 		kernel_metis->addGlobalArg(hashes);
 		kernel_metis->addGlobalArg(out);
@@ -111,10 +122,17 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		kernel_metis->addScalarUInt(n*STEP_SIZE);
 		kernel_metis->addScalarUInt(target);
 
+        kernel_metis->addGlobalArg(metis_mixtab0);
+        kernel_metis->addGlobalArg(metis_mixtab1);
+        kernel_metis->addGlobalArg(metis_mixtab2);
+        kernel_metis->addGlobalArg(metis_mixtab3);
+
 		cl_uint out_count_tmp = 0;
 		q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
+
 		q->enqueueKernel1D(kernel_metis, STEP_SIZE,
 				kernel_metis->getWorkGroupSize(device));
+
 		q->enqueueReadBuffer(out, out_tmp, sizeof(cl_uint) * 255);
 		q->enqueueReadBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 		q->finish();
@@ -128,9 +146,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		totalCollisionCount += STEP_SIZE;
 #ifdef MEASURE_TIME
 		uint32 end = getTimeMilliseconds();
-        uint32 overhead = (end-begin) - (end_keccak-begin) - (end_shavite-end_keccak) - (end-end_shavite);
-		printf("Elapsed time: %d (k = %d, s = %d, m = %d) ms\n", (end-begin), (end_keccak-begin), (end_shavite-end_keccak), (end-end_shavite));
-        printf("Total Overhead: %d ms\n", overhead);
+		printf("Elapsed time: %d ms (k = %d, s = %d, m = %d)\n", (end-begin), (end_keccak-begin), (end_shavite-end_keccak), (end-end_shavite));
 #endif
 
 #ifdef VALIDATE_ALGORITHMS

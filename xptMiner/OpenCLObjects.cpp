@@ -289,6 +289,10 @@ OpenCLProgram* OpenCLContext::loadProgramFromFiles(std::vector<std::string> file
 	std::vector<std::string> file_strs;
 	for (int i = 0; i < filenames.size(); i++) {
 		std::ifstream file (filenames[i].c_str());
+        if (!file.good()) {
+            std::cout << "ERROR: Input file '" << filenames[i] << "' is missing or unreadable." << std::endl;
+        }
+        assert(file.good());
 		std::string file_str((std::istreambuf_iterator<char>(file)),
 		                 std::istreambuf_iterator<char>());
 		file_strs.push_back(file_str);
@@ -340,13 +344,6 @@ OpenCLContext* OpenCLDevice::getContext() {
 		check_error(error);
 	}
 	return context;
-}
-
-int not_main(int argc, char **argv) {
-	std::vector<std::string> files;
-	files.push_back("opencl/cryptsha512_kernel.cl");
-	files.push_back("OpenCLMomentum.cl");
-	//OpenCLMain::getInstance().getPlatform(0)->getContext()->loadProgramFromFiles(files);
 }
 
 OpenCLKernel* OpenCLProgram::getKernel(std::string name) {

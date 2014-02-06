@@ -24,7 +24,18 @@ private:
 	OpenCLBuffer* hashes;
 	OpenCLBuffer* out;
 	OpenCLBuffer* out_count;
-	OpenCLCommandQueue * q;
+
+    OpenCLBuffer* metis_mixtab0;
+	OpenCLBuffer* metis_mixtab1;
+    OpenCLBuffer* metis_mixtab2;
+    OpenCLBuffer* metis_mixtab3;
+
+    OpenCLBuffer* shavite_AES0;
+    OpenCLBuffer* shavite_AES1;
+    OpenCLBuffer* shavite_AES2;
+    OpenCLBuffer* shavite_AES3;
+
+    OpenCLCommandQueue * q;
 	uint32_t out_tmp[255];
 };
 
