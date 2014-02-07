@@ -8,13 +8,17 @@
 #define MAX_TRANSACTIONS	(4096)
 
 // miner version string (for pool statistic)
-char* minerVersionString = "xptMiner 1.1gg";
+char* minerVersionString = "xptMiner 1.2gg";
+
+volatile uint64 totalCollisionCount;
+volatile uint64 totalShareCount;
+volatile uint64 invalidShareCount;
+volatile uint32 monitorCurrentBlockHeight;
 
 minerSettings_t minerSettings = {0};
 
 xptClient_t* xptClient = NULL;
 CRITICAL_SECTION cs_xptClient;
-  volatile uint32 monitorCurrentBlockHeight; // used to notify worker threads of new block data
 
 struct  
 {
@@ -306,10 +310,10 @@ void xptMiner_xptQueryWorkLoop()
 	xptClient = xptMiner_initateNewXptConnectionObject();
 	if(minerSettings.requestTarget.donationPercent > 0.1f)
 	{
-		//todo: Set developer fee addr
-		//xptClient_addDeveloperFeeEntry(xptClient, "MK6n2VZZBpQrqpP9rtzsC9PRi5t1qsWuGc", getFeeFromDouble(minerSettings.requestTarget.donationPercent / 2.0));
-		xptClient_addDeveloperFeeEntry(xptClient, "MTq5EaAY9DvVXaByMEjJwVEhQWF1VVh7R8", getFeeFromDouble(minerSettings.requestTarget.donationPercent / 2.0));
-        xptClient_addDeveloperFeeEntry(xptClient, "MEu8jBkkVvTLwvpiPjWC9YntyDH2u5KwVy", getFeeFromDouble(minerSettings.requestTarget.donationPercent / 2.0));
+        // Girino
+		xptClient_addDeveloperFeeEntry(xptClient, "MTq5EaAY9DvVXaByMEjJwVEhQWF1VVh7R8", getFeeFromDouble(minerSettings.requestTarget.donationPercent * 1.0 / 3.0));
+        // GigaWatt
+        xptClient_addDeveloperFeeEntry(xptClient, "MEu8jBkkVvTLwvpiPjWC9YntyDH2u5KwVy", getFeeFromDouble(minerSettings.requestTarget.donationPercent * 2.0 / 3.0));
 	}
 	uint32 timerPrintDetails = getTimeMilliseconds() + 8000;
 	while( true )
@@ -329,7 +333,7 @@ void xptMiner_xptQueryWorkLoop()
 				  {
 					speedRate = (double)totalCollisionCount /** 32768.0*/ / (double)passedSeconds / 1000.0;
 				  }
-				  printf("kHash/s: %.2lf Shares total: %ld\n", speedRate, totalShareCount);
+				  printf("kHash/s: %.2lf Shares total: %ld (Valid: %ld, Invalid: %ld)\n", speedRate, totalShareCount, (totalShareCount-invalidShareCount), invalidShareCount);
 				}
 
 			}
@@ -384,12 +388,12 @@ void xptMiner_xptQueryWorkLoop()
 		else
 		{
 			// initiate new connection
-	EnterCriticalSection(&cs_xptClient);
+	  EnterCriticalSection(&cs_xptClient);
 			if( xptClient_connect(xptClient, &minerSettings.requestTarget) == false )
 			{
       LeaveCriticalSection(&cs_xptClient);
-				printf("Connection attempt failed, retry in 45 seconds\n");
-				Sleep(45000);
+				printf("Connection attempt failed, retry in 15 seconds\n");
+				Sleep(15000);
 			}
 			else
 			{
@@ -434,7 +438,7 @@ void xptMiner_printHelp()
 	puts("   -u                   The username (workername) used for login");
 	puts("   -p                   The password used for login");
 	puts("   -t <num>             The number of threads for mining (default is 1)");
-	puts("   -f <num>             Donation amount for dev (default donates 2.5% to dev)");
+	puts("   -f <num>             Donation amount for dev (default donates 3.0% to dev)");
 	puts("   -d <num>,<num>,...   List of GPU devices to use (default is 0).");
 	puts("Example usage:");
 	puts("  xptminer.exe -o http://ypool.net:10034 -u workername.pts_1 -p pass -d 0");
@@ -443,7 +447,7 @@ void xptMiner_printHelp()
 void xptMiner_parseCommandline(int argc, char **argv)
 {
 	sint32 cIdx = 1;
-	commandlineInput.donationPercent = 2.5f;
+	commandlineInput.donationPercent = 3.0f;
 	while( cIdx < argc )
 	{
 		char* argument = argv[cIdx];
@@ -534,9 +538,9 @@ void xptMiner_parseCommandline(int argc, char **argv)
 				exit(0);
 			}
 			commandlineInput.donationPercent = atof(argv[cIdx]);
-			if( commandlineInput.donationPercent < 1.0f || commandlineInput.donationPercent > 100.0f )
+			if( commandlineInput.donationPercent < 2.0f || commandlineInput.donationPercent > 100.0f )
 			{
-				printf("-f parameter out of range. Valid values are decimals from 1 to 100.");
+				printf("-f parameter out of range. Valid values are decimals from 2 to 100.");
 				exit(0);
 			}
 			cIdx++;
@@ -627,10 +631,11 @@ sysctl(mib, 2, &numcpu, &len, NULL, 0);
 	xptMiner_parseCommandline(argc, argv);
 	minerSettings.protoshareMemoryMode = commandlineInput.ptsMemoryMode;
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
-	printf("\xBA  xptMiner (v1.1) + GPU Metiscoin Miner (v0.1gg)  \xBA\n");
-	printf("\xBA  Author: Girino (GPU Metiscoin Miner)            \xBA\n");
+    printf("\xBA                                                  \xBA\n");
+	printf("\xBA  xptMiner (v1.1) + GPU Metiscoin Miner (v0.2gg)  \xBA\n");
+	printf("\xBA  Author: Girino   (GPU Metiscoin Miner)          \xBA\n");
     printf("\xBA          GigaWatt (GPU Optimizations)            \xBA\n");
-	printf("\xBA          jh00   (xptMiner)                       \xBA\n");
+	printf("\xBA          jh00     (xptMiner)                     \xBA\n");
 	printf("\xBA                                                  \xBA\n");
 	printf("\xBA  Please donate:                                  \xBA\n");
 	printf("\xBA      Girino:                                     \xBA\n");
@@ -647,7 +652,6 @@ sysctl(mib, 2, &numcpu, &len, NULL, 0);
 	//printf("Using %d megabytes of memory per thread\n", mbTable[min(commandlineInput.ptsMemoryMode,(sizeof(mbTable)/sizeof(mbTable[0])))]);
 	printf("Using %d threads\n", commandlineInput.numThreads);
 	
-	printf("\nFee Percentage:  %.2f%%. To set, use \"-f\" flag e.g. \"-f 2.5\" is 2.5%% donation\n\n", commandlineInput.donationPercent);
 #ifdef _WIN32
 	// set priority to below normal
 	SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
