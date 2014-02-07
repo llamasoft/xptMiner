@@ -18,7 +18,7 @@ __constant const uint IV512shavite[] __attribute__ ((aligned)) = {
 	C32(0xE275EADE), C32(0x502D9FCD), C32(0xB9357178), C32(0x022A4B9A)
 };
 
-static void
+void
 shavite_init(shavite_context *sc)
 {
     #pragma unroll

@@ -438,7 +438,7 @@ void keccak_core_end_64_8(keccak_context *kc, const void *data)
 }
 
 // d = 64, lim = 72, ub = 0. n = 0
-static void keccak_close(keccak_context *kc, void *dst)
+void keccak_close(keccak_context *kc, void *dst)
 {
     union {
         unsigned char tmp[72 + 1];

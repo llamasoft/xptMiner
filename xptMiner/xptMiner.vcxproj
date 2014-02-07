@@ -93,7 +93,7 @@
       <AdditionalDependencies>OpenCL.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(SolutionDir)opencl" "$(TargetDir)"</Command>
+      <Command>xcopy /e /y "$(SolutionDir)opencl" "$(TargetDir)opencl\"</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>Copying OpenCL files...</Message>
@@ -143,7 +143,7 @@
       <AdditionalDependencies>OpenCL.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(SolutionDir)opencl" "$(TargetDir)"</Command>
+      <Command>xcopy /e /y "$(SolutionDir)opencl" "$(TargetDir)opencl\"</Command>
       <Message>Copying OpenCL files...</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>

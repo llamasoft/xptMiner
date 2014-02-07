@@ -424,6 +424,7 @@ typedef struct
 	// mode option
 	uint32 mode;
 	float donationPercent;
+    int algorithm;
 }commandlineInput_t;
 
 commandlineInput_t commandlineInput;
@@ -439,15 +440,20 @@ void xptMiner_printHelp()
 	puts("   -p                   The password used for login");
 	puts("   -t <num>             The number of threads for mining (default is 1)");
 	puts("   -f <num>             Donation amount for dev (default donates 3.0% to dev)");
+    puts("   -a <num>             The algorithm variant to use (1 or 2, default is 1)");
 	puts("   -d <num>,<num>,...   List of GPU devices to use (default is 0).");
 	puts("Example usage:");
-	puts("  xptminer.exe -o http://ypool.net:10034 -u workername.pts_1 -p pass -d 0");
+	puts("  xptminer.exe -o ypool.net -u workername.mtc_1 -p pass -d 0");
 }
 
 void xptMiner_parseCommandline(int argc, char **argv)
 {
 	sint32 cIdx = 1;
+
+    // Default values
 	commandlineInput.donationPercent = 3.0f;
+    commandlineInput.algorithm = 1;
+
 	while( cIdx < argc )
 	{
 		char* argument = argv[cIdx];
@@ -537,12 +543,11 @@ void xptMiner_parseCommandline(int argc, char **argv)
 				printf("Missing amount number after -f option\n");
 				exit(0);
 			}
-			commandlineInput.donationPercent = atof(argv[cIdx]);
-			if( commandlineInput.donationPercent < 2.0f || commandlineInput.donationPercent > 100.0f )
-			{
-				printf("-f parameter out of range. Valid values are decimals from 2 to 100.");
-				exit(0);
-			}
+            float pct = atof(argv[cIdx]);
+            if (pct <   2.0) { pct = 2.0;   }
+            if (pct > 100.0) { pct = 100.0; }
+			commandlineInput.donationPercent = pct;
+            
 			cIdx++;
 		}
 		else if( memcmp(argument, "-list-devices", 14)==0 )
@@ -568,6 +573,24 @@ void xptMiner_parseCommandline(int argc, char **argv)
 			commandlineInput.deviceList.push_back(atoi(list.c_str()));
 			cIdx++;
 		}
+        else if( memcmp(argument, "-a", 2)==0 )
+        {
+            if ( cIdx >= argc )
+            {
+                printf("Missing algorithm number after %s option\n", argument);
+                exit(0);
+            }
+
+            uint32 algo = atoi(argv[cIdx]);
+            if (algo < 1 || algo > 2)
+            {
+                printf("Algorithm value '%d' is invalid.  Valid algorithm values are 1 or 2.\n", algo);
+                exit(0);
+            }
+
+            commandlineInput.algorithm = algo;
+            cIdx++;
+        }
 		else if( memcmp(argument, "-help", 6)==0 || memcmp(argument, "--help", 7)==0 )
 		{
 			xptMiner_printHelp();
@@ -651,6 +674,7 @@ sysctl(mib, 2, &numcpu, &len, NULL, 0);
 	uint32 mbTable[] = {512,256,128,32,8};
 	//printf("Using %d megabytes of memory per thread\n", mbTable[min(commandlineInput.ptsMemoryMode,(sizeof(mbTable)/sizeof(mbTable[0])))]);
 	printf("Using %d threads\n", commandlineInput.numThreads);
+    printf("Using algorithm variant %d\n", commandlineInput.algorithm);
 	
 #ifdef _WIN32
 	// set priority to below normal
@@ -704,7 +728,7 @@ sysctl(mib, 2, &numcpu, &len, NULL, 0);
 	printf("Initializing GPU...\n");
 	for (int i = 0; i < commandlineInput.deviceList.size(); i++) {
 		printf("Initing device %d.\n", i);
-		gpu_processors.push_back(new MetiscoinOpenCL(commandlineInput.deviceList[i]));
+		gpu_processors.push_back(new MetiscoinOpenCL(commandlineInput.deviceList[i], commandlineInput.algorithm));
 		printf("Device %d Inited.\n", i);
 	}
 	printf("All GPUs Initialized...\n");
