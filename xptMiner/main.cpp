@@ -331,7 +331,7 @@ void xptMiner_xptQueryWorkLoop()
 				  // speed is represented as khash/s (in steps of 0x8000)
 				  if( passedSeconds > 5 )
 				  {
-					speedRate = (double)totalCollisionCount /** 32768.0*/ / (double)passedSeconds / 1000.0;
+					speedRate = (double)totalCollisionCount / (double)passedSeconds / 1000.0;
 				  }
 				  printf("kHash/s: %.2lf Shares total: %ld (Valid: %ld, Invalid: %ld)\n", speedRate, totalShareCount, (totalShareCount-invalidShareCount), invalidShareCount);
 				}
@@ -353,11 +353,11 @@ void xptMiner_xptQueryWorkLoop()
 				monitorCurrentBlockHeight = 0;
       LeaveCriticalSection(&workDataSource.cs_work);
 				// we lost connection :(
-				printf("Connection to server lost - Reconnect in 45 seconds\n");
+				printf("Connection to server lost - Reconnect in 15 seconds\n");
 				xptClient_forceDisconnect(xptClient);
       LeaveCriticalSection(&cs_xptClient);
-				// pause 45 seconds
-				Sleep(45000);
+				// pause 15 seconds
+				Sleep(15000);
 			}
 			else
 			{
