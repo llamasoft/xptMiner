@@ -97,6 +97,7 @@ class OpenCLDevice {
 public:
 	OpenCLDevice(cl_device_id _id, OpenCLPlatform* _parent);
 	virtual ~OpenCLDevice();
+    void dumpDeviceInfo();
 	std::string getName();
 	long getMaxWorkGroupSize();
 	long getMaxMemAllocSize();

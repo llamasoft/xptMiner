@@ -1,4 +1,5 @@
 
+#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
 #ifdef _ECLIPSE_OPENCL_HEADER
 #   include "OpenCLKernel.hpp"
 #endif
@@ -11,11 +12,11 @@ __constant uint IV512metis[] __attribute__ ((aligned)) = {
 };
 
 typedef struct {
-	uint S[36];
-	ulong bit_count;
-	uint partial;
-	uint partial_len;
-	uint round_shift;
+    uint S[36];
+    ulong bit_count;
+    uint partial;
+    uint partial_len;
+    uint round_shift;
 } __attribute__ ((aligned)) metis_context;
 
 #define METIS_NOCOPY
@@ -85,7 +86,7 @@ typedef struct {
     S24 = S[24]; S25 = S[25]; S26 = S[26]; S27 = S[27]; \
     S28 = S[28]; S29 = S[29]; S30 = S[30]; S31 = S[31]; \
     S32 = S[32]; S33 = S[33]; S34 = S[34]; S35 = S[35];
-    
+
 #define WRITESTATE \
     S[ 0] =  S0; S[ 1] =  S1; S[ 2] =  S2; S[ 3] =  S3; \
     S[ 4] =  S4; S[ 5] =  S5; S[ 6] =  S6; S[ 7] =  S7; \
@@ -96,7 +97,7 @@ typedef struct {
     S[24] = S24; S[25] = S25; S[26] = S26; S[27] = S27; \
     S[28] = S28; S[29] = S29; S[30] = S30; S[31] = S31; \
     S[32] = S32; S[33] = S33; S[34] = S34; S[35] = S35;
-    
+
 #endif
 
 #define METIS_LOOKUP0 local_mixtab0
@@ -106,79 +107,87 @@ typedef struct {
 
 
 void metis_init(metis_context* sc) {
-	size_t u;
+    size_t u;
 
 #pragma unroll
-	for (u = 0; u < 20; u ++)
-		sc->S[u] = 0;
+    for (u = 0; u < 20; u ++)
+        sc->S[u] = 0;
 #pragma unroll
-	for (int i = 0; i < 16; i++) {
-		sc->S[20+i] = IV512metis[i];
-	}
-	sc->partial = 0;
-	sc->partial_len = 0;
-	sc->round_shift = 0;
-	sc->bit_count = 0;
+    for (int i = 0; i < 16; i++) {
+        sc->S[20+i] = IV512metis[i];
+    }
+    sc->partial = 0;
+    sc->partial_len = 0;
+    sc->round_shift = 0;
+    sc->bit_count = 0;
 }
 
 // Seriously, who the hell comes up with this?
 #define TIX4(q, x00, x01, x04, x07, x08, x22, x24, x27, x30)   { \
-		x22 ^= x00; \
-		x00 = (q); \
-		x08 ^= x00; \
-		x01 ^= x24; \
-		x04 ^= x27; \
-		x07 ^= x30; \
-	}
+        x22 ^= x00; \
+        x00 = (q); \
+        x08 ^= x00; \
+        x01 ^= x24; \
+        x04 ^= x27; \
+        x07 ^= x30; \
+    }
 
 #define CMIX36(x00, x01, x02, x04, x05, x06, x18, x19, x20)   { \
-		x00 ^= x04; \
-		x01 ^= x05; \
-		x02 ^= x06; \
-		x18 ^= x04; \
-		x19 ^= x05; \
-		x20 ^= x06; \
-	}
+        x00 ^= x04; \
+        x01 ^= x05; \
+        x02 ^= x06; \
+        x18 ^= x04; \
+        x19 ^= x05; \
+        x20 ^= x06; \
+    }
 
 #define SMIX(x0, x1, x2, x3)   { \
     /* Consider computing "x" bytes free, but lookup is expensive. */  \
     /* Group the lookups by table to hopefully use the cache.      */  \
-    uint c0 = METIS_LOOKUP0[(uchar)(x0 >> 24)]; \
-    uint c1 = METIS_LOOKUP0[(uchar)(x1 >> 24)]; \
-    uint c2 = METIS_LOOKUP0[(uchar)(x2 >> 24)]; \
-    uint c3 = METIS_LOOKUP0[(uchar)(x3 >> 24)]; \
-    uint r0 = METIS_LOOKUP0[(uchar)(x1 >> 24)]  \
-            ^ METIS_LOOKUP0[(uchar)(x2 >> 24)]  \
-            ^ METIS_LOOKUP0[(uchar)(x3 >> 24)]; \
+    uint c0, c1, c2, c3, r0, r1, r2, r3, t; \
     \
-    c0 ^= METIS_LOOKUP1[(uchar)(x0 >> 16)];     \
-    c1 ^= METIS_LOOKUP1[(uchar)(x1 >> 16)];     \
-    c2 ^= METIS_LOOKUP1[(uchar)(x2 >> 16)];     \
-    c3 ^= METIS_LOOKUP1[(uchar)(x3 >> 16)];     \
-    uint r1 = METIS_LOOKUP1[(uchar)(x0 >> 16)]  \
-            ^ METIS_LOOKUP1[(uchar)(x2 >> 16)]  \
-            ^ METIS_LOOKUP1[(uchar)(x3 >> 16)]; \
+    c0  = METIS_LOOKUP0[(uchar)(x0 >> 24)]; \
+    c1  = METIS_LOOKUP0[(uchar)(x1 >> 24)]; \
+    r0  = c1;                               \
+    c2  = METIS_LOOKUP0[(uchar)(x2 >> 24)]; \
+    r0 ^= c2;                               \
+    c3  = METIS_LOOKUP0[(uchar)(x3 >> 24)]; \
+    r0 ^= c3;                               \
     \
-    c0 ^= METIS_LOOKUP2[(uchar)(x0 >>  8)];     \
-    c1 ^= METIS_LOOKUP2[(uchar)(x1 >>  8)];     \
-    c2 ^= METIS_LOOKUP2[(uchar)(x2 >>  8)];     \
-    c3 ^= METIS_LOOKUP2[(uchar)(x3 >>  8)];     \
-    uint r2 = METIS_LOOKUP2[(uchar)(x0 >>  8)]  \
-            ^ METIS_LOOKUP2[(uchar)(x1 >>  8)]  \
-            ^ METIS_LOOKUP2[(uchar)(x3 >>  8)]; \
+    r1  = METIS_LOOKUP1[(uchar)(x0 >> 16)]; \
+    c0 ^= r1;                               \
+    c1 ^= METIS_LOOKUP1[(uchar)(x1 >> 16)]; \
+     t  = METIS_LOOKUP1[(uchar)(x2 >> 16)]; \
+    c2 ^= t;                                \
+    r1 ^= t;                                \
+     t  = METIS_LOOKUP1[(uchar)(x3 >> 16)]; \
+    c3 ^= t;                                \
+    r1 ^= t;                                \
     \
-    c0 ^= METIS_LOOKUP3[(uchar)(x0)];           \
-    c1 ^= METIS_LOOKUP3[(uchar)(x1)];           \
-    c2 ^= METIS_LOOKUP3[(uchar)(x2)];           \
-    c3 ^= METIS_LOOKUP3[(uchar)(x3)];           \
-    uint r3 = METIS_LOOKUP3[(uchar)(x0      )]  \
-            ^ METIS_LOOKUP3[(uchar)(x1      )]  \
-            ^ METIS_LOOKUP3[(uchar)(x2      )]; \
+    r2  = METIS_LOOKUP2[(uchar)(x0 >> 8)];  \
+    c0 ^= r2;                               \
+     t  = METIS_LOOKUP2[(uchar)(x1 >> 8)];  \
+    c1 ^= t;                                \
+    r2 ^= t;                                \
+    c2 ^= METIS_LOOKUP2[(uchar)(x2 >> 8)];  \
+     t  = METIS_LOOKUP2[(uchar)(x3 >> 8)];  \
+    c3 ^= t;                                \
+    r2 ^= t;                                \
     \
-    x0 =  ((c0 ^ r0) & (0xFF000000))  \
-        | ((c1 ^ r1) & (0x00FF0000))  \
-        | ((c2 ^ r2) & (0x0000FF00))  \
-        | ((c3 ^ r3) & (0x000000FF)); \
+    r3  = METIS_LOOKUP3[(uchar)(x0)];       \
+    c0 ^= r3;                               \
+     t  = METIS_LOOKUP3[(uchar)(x1)];       \
+    c1 ^= t;                                \
+    r3 ^= t;                                \
+     t  = METIS_LOOKUP3[(uchar)(x2)];       \
+    c2 ^= t;                                \
+    r3 ^= t;                                \
+    c3 ^= METIS_LOOKUP3[(uchar)(x3)];       \
+    \
+    x0 =  ((c0 ^  r0)        & (0xFF000000))  \
+        | ((c1 ^  r1)        & (0x00FF0000))  \
+        | ((c2 ^  r2)        & (0x0000FF00))  \
+        | ((c3 ^  r3)        & (0x000000FF)); \
     x1 =  ((c1 ^ (r0 <<  8)) & (0xFF000000))  \
         | ((c2 ^ (r1 <<  8)) & (0x00FF0000))  \
         | ((c3 ^ (r2 <<  8)) & (0x0000FF00))  \
@@ -193,34 +202,34 @@ void metis_init(metis_context* sc) {
         | ((c2 ^ (r3 >>  8)) & (0x000000FF)); \
 }
 
-    
+
 #define my_dec32be(src) (((uint)(((const unsigned char *)src)[0]) << 24) \
-						| ((uint)(((const unsigned char *)src)[1]) << 16) \
-						| ((uint)(((const unsigned char *)src)[2]) << 8) \
-						| (uint)(((const unsigned char *)src)[3]))
+                        | ((uint)(((const unsigned char *)src)[1]) << 16) \
+                        | ((uint)(((const unsigned char *)src)[2]) << 8) \
+                        | (uint)(((const unsigned char *)src)[3]))
 
 
 void
 enc64be(void *dst, ulong val)
 {
-	((unsigned char *)dst)[0] = (val >> 56);
-	((unsigned char *)dst)[1] = (val >> 48);
-	((unsigned char *)dst)[2] = (val >> 40);
-	((unsigned char *)dst)[3] = (val >> 32);
-	((unsigned char *)dst)[4] = (val >> 24);
-	((unsigned char *)dst)[5] = (val >> 16);
-	((unsigned char *)dst)[6] = (val >> 8);
-	((unsigned char *)dst)[7] = val;
+    ((unsigned char *)dst)[0] = (val >> 56);
+    ((unsigned char *)dst)[1] = (val >> 48);
+    ((unsigned char *)dst)[2] = (val >> 40);
+    ((unsigned char *)dst)[3] = (val >> 32);
+    ((unsigned char *)dst)[4] = (val >> 24);
+    ((unsigned char *)dst)[5] = (val >> 16);
+    ((unsigned char *)dst)[6] = (val >> 8);
+    ((unsigned char *)dst)[7] = val;
 }
 
 
 void
 enc32be(void *dst, uint val)
 {
-	((unsigned char *)dst)[0] = (val >> 24);
-	((unsigned char *)dst)[1] = (val >> 16);
-	((unsigned char *)dst)[2] = (val >> 8);
-	((unsigned char *)dst)[3] = val;
+    ((unsigned char *)dst)[0] = (val >> 24);
+    ((unsigned char *)dst)[1] = (val >> 16);
+    ((unsigned char *)dst)[2] = (val >> 8);
+    ((unsigned char *)dst)[3] = val;
 }
 
 
@@ -230,197 +239,197 @@ void metis_core_and_close(metis_context *sc, const void *vdata, void *dst,
                           local uint* METIS_LOOKUP1,
                           local uint* METIS_LOOKUP2,
                           local uint* METIS_LOOKUP3
-                          ) 
+                          )
 {
     const unsigned char * cdata = (const unsigned char *)vdata;
-	uint* S = sc->S;
+    uint* S = sc->S;
     DECLSTATE;
     READSTATE;
-    
-	TIX4(my_dec32be(cdata), S0, S1, S4, S7, S8, S22, S24, S27, S30);
-	CMIX36(S33, S34, S35, S1, S2, S3, S15, S16, S17);
-	SMIX(S33, S34, S35, S0);
-	CMIX36(S30, S31, S32, S34, S35, S0, S12, S13, S14);
-	SMIX(S30, S31, S32, S33);
-	CMIX36(S27, S28, S29, S31, S32, S33, S9, S10, S11);
-	SMIX(S27, S28, S29, S30);
-	CMIX36(S24, S25, S26, S28, S29, S30, S6, S7, S8);
-	SMIX(S24, S25, S26, S27);
-	/* fall through */
-	TIX4(my_dec32be(cdata+4), S24, S25, S28, S31, S32, S10, S12, S15, S18);
-	CMIX36(S21, S22, S23, S25, S26, S27, S3, S4, S5);
-	SMIX(S21, S22, S23, S24);
-	CMIX36(S18, S19, S20, S22, S23, S24, S0, S1, S2);
-	SMIX(S18, S19, S20, S21);
-	CMIX36(S15, S16, S17, S19, S20, S21, S33, S34, S35);
-	SMIX(S15, S16, S17, S18);
-	CMIX36(S12, S13, S14, S16, S17, S18, S30, S31, S32);
-	SMIX(S12, S13, S14, S15);
-	/* fall through */
-	TIX4(my_dec32be(cdata+8), S12, S13, S16, S19, S20, S34, S0, S3, S6);
-	CMIX36(S9, S10, S11, S13, S14, S15, S27, S28, S29);
-	SMIX(S9, S10, S11, S12);
-	CMIX36(S6, S7, S8, S10, S11, S12, S24, S25, S26);
-	SMIX(S6, S7, S8, S9);
-	CMIX36(S3, S4, S5, S7, S8, S9, S21, S22, S23);
-	SMIX(S3, S4, S5, S6);
-	CMIX36(S0, S1, S2, S4, S5, S6, S18, S19, S20);
-	SMIX(S0, S1, S2, S3);
-	// x
-	TIX4(my_dec32be(cdata+12), S0, S1, S4, S7, S8, S22, S24, S27, S30);
-	CMIX36(S33, S34, S35, S1, S2, S3, S15, S16, S17);
-	SMIX(S33, S34, S35, S0);
-	CMIX36(S30, S31, S32, S34, S35, S0, S12, S13, S14);
-	SMIX(S30, S31, S32, S33);
-	CMIX36(S27, S28, S29, S31, S32, S33, S9, S10, S11);
-	SMIX(S27, S28, S29, S30);
-	CMIX36(S24, S25, S26, S28, S29, S30, S6, S7, S8);
-	SMIX(S24, S25, S26, S27);
-	/* fall through */
-	TIX4(my_dec32be(cdata+16), S24, S25, S28, S31, S32, S10, S12, S15, S18);
-	CMIX36(S21, S22, S23, S25, S26, S27, S3, S4, S5);
-	SMIX(S21, S22, S23, S24);
-	CMIX36(S18, S19, S20, S22, S23, S24, S0, S1, S2);
-	SMIX(S18, S19, S20, S21);
-	CMIX36(S15, S16, S17, S19, S20, S21, S33, S34, S35);
-	SMIX(S15, S16, S17, S18);
-	CMIX36(S12, S13, S14, S16, S17, S18, S30, S31, S32);
-	SMIX(S12, S13, S14, S15);
-	/* fall through */
-	TIX4(my_dec32be(cdata+20), S12, S13, S16, S19, S20, S34, S0, S3, S6);
-	CMIX36(S9, S10, S11, S13, S14, S15, S27, S28, S29);
-	SMIX(S9, S10, S11, S12);
-	CMIX36(S6, S7, S8, S10, S11, S12, S24, S25, S26);
-	SMIX(S6, S7, S8, S9);
-	CMIX36(S3, S4, S5, S7, S8, S9, S21, S22, S23);
-	SMIX(S3, S4, S5, S6);
-	CMIX36(S0, S1, S2, S4, S5, S6, S18, S19, S20);
-	SMIX(S0, S1, S2, S3);
-	TIX4(my_dec32be(cdata+24), S0, S1, S4, S7, S8, S22, S24, S27, S30);
-	CMIX36(S33, S34, S35, S1, S2, S3, S15, S16, S17);
-	SMIX(S33, S34, S35, S0);
-	CMIX36(S30, S31, S32, S34, S35, S0, S12, S13, S14);
-	SMIX(S30, S31, S32, S33);
-	CMIX36(S27, S28, S29, S31, S32, S33, S9, S10, S11);
-	SMIX(S27, S28, S29, S30);
-	CMIX36(S24, S25, S26, S28, S29, S30, S6, S7, S8);
-	SMIX(S24, S25, S26, S27);
-	/* fall through */
-	TIX4(my_dec32be(cdata+28), S24, S25, S28, S31, S32, S10, S12, S15, S18);
-	CMIX36(S21, S22, S23, S25, S26, S27, S3, S4, S5);
-	SMIX(S21, S22, S23, S24);
-	CMIX36(S18, S19, S20, S22, S23, S24, S0, S1, S2);
-	SMIX(S18, S19, S20, S21);
-	CMIX36(S15, S16, S17, S19, S20, S21, S33, S34, S35);
-	SMIX(S15, S16, S17, S18);
-	CMIX36(S12, S13, S14, S16, S17, S18, S30, S31, S32);
-	SMIX(S12, S13, S14, S15);
-	/* fall through */
-	TIX4(my_dec32be(cdata+32), S12, S13, S16, S19, S20, S34, S0, S3, S6);
-	CMIX36(S9, S10, S11, S13, S14, S15, S27, S28, S29);
-	SMIX(S9, S10, S11, S12);
-	CMIX36(S6, S7, S8, S10, S11, S12, S24, S25, S26);
-	SMIX(S6, S7, S8, S9);
-	CMIX36(S3, S4, S5, S7, S8, S9, S21, S22, S23);
-	SMIX(S3, S4, S5, S6);
-	CMIX36(S0, S1, S2, S4, S5, S6, S18, S19, S20);
-	SMIX(S0, S1, S2, S3);
-	// x
-	TIX4(my_dec32be(cdata+36), S0, S1, S4, S7, S8, S22, S24, S27, S30);
-	CMIX36(S33, S34, S35, S1, S2, S3, S15, S16, S17);
-	SMIX(S33, S34, S35, S0);
-	CMIX36(S30, S31, S32, S34, S35, S0, S12, S13, S14);
-	SMIX(S30, S31, S32, S33);
-	CMIX36(S27, S28, S29, S31, S32, S33, S9, S10, S11);
-	SMIX(S27, S28, S29, S30);
-	CMIX36(S24, S25, S26, S28, S29, S30, S6, S7, S8);
-	SMIX(S24, S25, S26, S27);
-	/* fall through */
-	TIX4(my_dec32be(cdata+40), S24, S25, S28, S31, S32, S10, S12, S15, S18);
-	CMIX36(S21, S22, S23, S25, S26, S27, S3, S4, S5);
-	SMIX(S21, S22, S23, S24);
-	CMIX36(S18, S19, S20, S22, S23, S24, S0, S1, S2);
-	SMIX(S18, S19, S20, S21);
-	CMIX36(S15, S16, S17, S19, S20, S21, S33, S34, S35);
-	SMIX(S15, S16, S17, S18);
-	CMIX36(S12, S13, S14, S16, S17, S18, S30, S31, S32);
-	SMIX(S12, S13, S14, S15);
-	/* fall through */
-	TIX4(my_dec32be(cdata+44), S12, S13, S16, S19, S20, S34, S0, S3, S6);
-	CMIX36(S9, S10, S11, S13, S14, S15, S27, S28, S29);
-	SMIX(S9, S10, S11, S12);
-	CMIX36(S6, S7, S8, S10, S11, S12, S24, S25, S26);
-	SMIX(S6, S7, S8, S9);
-	CMIX36(S3, S4, S5, S7, S8, S9, S21, S22, S23);
-	SMIX(S3, S4, S5, S6);
-	CMIX36(S0, S1, S2, S4, S5, S6, S18, S19, S20);
-	SMIX(S0, S1, S2, S3);
-	// x
-	TIX4(my_dec32be(cdata+48), S0, S1, S4, S7, S8, S22, S24, S27, S30);
-	CMIX36(S33, S34, S35, S1, S2, S3, S15, S16, S17);
-	SMIX(S33, S34, S35, S0);
-	CMIX36(S30, S31, S32, S34, S35, S0, S12, S13, S14);
-	SMIX(S30, S31, S32, S33);
-	CMIX36(S27, S28, S29, S31, S32, S33, S9, S10, S11);
-	SMIX(S27, S28, S29, S30);
-	CMIX36(S24, S25, S26, S28, S29, S30, S6, S7, S8);
-	SMIX(S24, S25, S26, S27);
-	/* fall through */
-	TIX4(my_dec32be(cdata+52), S24, S25, S28, S31, S32, S10, S12, S15, S18);
-	CMIX36(S21, S22, S23, S25, S26, S27, S3, S4, S5);
-	SMIX(S21, S22, S23, S24);
-	CMIX36(S18, S19, S20, S22, S23, S24, S0, S1, S2);
-	SMIX(S18, S19, S20, S21);
-	CMIX36(S15, S16, S17, S19, S20, S21, S33, S34, S35);
-	SMIX(S15, S16, S17, S18);
-	CMIX36(S12, S13, S14, S16, S17, S18, S30, S31, S32);
-	SMIX(S12, S13, S14, S15);
-	/* fall through */
-	TIX4(my_dec32be(cdata+56), S12, S13, S16, S19, S20, S34, S0, S3, S6);
-	CMIX36(S9, S10, S11, S13, S14, S15, S27, S28, S29);
-	SMIX(S9, S10, S11, S12);
-	CMIX36(S6, S7, S8, S10, S11, S12, S24, S25, S26);
-	SMIX(S6, S7, S8, S9);
-	CMIX36(S3, S4, S5, S7, S8, S9, S21, S22, S23);
-	SMIX(S3, S4, S5, S6);
-	CMIX36(S0, S1, S2, S4, S5, S6, S18, S19, S20);
-	SMIX(S0, S1, S2, S3);
-	// moved from close
-	TIX4(my_dec32be(cdata+60), S0, S1, S4, S7, S8, S22, S24, S27, S30);
-	CMIX36(S33, S34, S35, S1, S2, S3, S15, S16, S17);
-	SMIX(S33, S34, S35, S0);
-	CMIX36(S30, S31, S32, S34, S35, S0, S12, S13, S14);
-	SMIX(S30, S31, S32, S33);
-	CMIX36(S27, S28, S29, S31, S32, S33, S9, S10, S11);
-	SMIX(S27, S28, S29, S30);
-	CMIX36(S24, S25, S26, S28, S29, S30, S6, S7, S8);
-	SMIX(S24, S25, S26, S27);
-	/* fall through */
-	TIX4(0, S24, S25, S28, S31, S32, S10, S12, S15, S18);
-	CMIX36(S21, S22, S23, S25, S26, S27, S3, S4, S5);
-	SMIX(S21, S22, S23, S24);
-	CMIX36(S18, S19, S20, S22, S23, S24, S0, S1, S2);
-	SMIX(S18, S19, S20, S21);
-	CMIX36(S15, S16, S17, S19, S20, S21, S33, S34, S35);
-	SMIX(S15, S16, S17, S18);
-	CMIX36(S12, S13, S14, S16, S17, S18, S30, S31, S32);
-	SMIX(S12, S13, S14, S15);
-	/* fall through */
-	TIX4(512, S12, S13, S16, S19, S20, S34, S0, S3, S6);
-	CMIX36(S9, S10, S11, S13, S14, S15, S27, S28, S29);
-	SMIX(S9, S10, S11, S12);
-	CMIX36(S6, S7, S8, S10, S11, S12, S24, S25, S26);
-	SMIX(S6, S7, S8, S9);
-	CMIX36(S3, S4, S5, S7, S8, S9, S21, S22, S23);
-	SMIX(S3, S4, S5, S6);
-	CMIX36(S0, S1, S2, S4, S5, S6, S18, S19, S20);
-	SMIX(S0, S1, S2, S3);
-    
-    
+
+    TIX4(my_dec32be(cdata), S0, S1, S4, S7, S8, S22, S24, S27, S30);
+    CMIX36(S33, S34, S35, S1, S2, S3, S15, S16, S17);
+    SMIX(S33, S34, S35, S0);
+    CMIX36(S30, S31, S32, S34, S35, S0, S12, S13, S14);
+    SMIX(S30, S31, S32, S33);
+    CMIX36(S27, S28, S29, S31, S32, S33, S9, S10, S11);
+    SMIX(S27, S28, S29, S30);
+    CMIX36(S24, S25, S26, S28, S29, S30, S6, S7, S8);
+    SMIX(S24, S25, S26, S27);
+    /* fall through */
+    TIX4(my_dec32be(cdata+4), S24, S25, S28, S31, S32, S10, S12, S15, S18);
+    CMIX36(S21, S22, S23, S25, S26, S27, S3, S4, S5);
+    SMIX(S21, S22, S23, S24);
+    CMIX36(S18, S19, S20, S22, S23, S24, S0, S1, S2);
+    SMIX(S18, S19, S20, S21);
+    CMIX36(S15, S16, S17, S19, S20, S21, S33, S34, S35);
+    SMIX(S15, S16, S17, S18);
+    CMIX36(S12, S13, S14, S16, S17, S18, S30, S31, S32);
+    SMIX(S12, S13, S14, S15);
+    /* fall through */
+    TIX4(my_dec32be(cdata+8), S12, S13, S16, S19, S20, S34, S0, S3, S6);
+    CMIX36(S9, S10, S11, S13, S14, S15, S27, S28, S29);
+    SMIX(S9, S10, S11, S12);
+    CMIX36(S6, S7, S8, S10, S11, S12, S24, S25, S26);
+    SMIX(S6, S7, S8, S9);
+    CMIX36(S3, S4, S5, S7, S8, S9, S21, S22, S23);
+    SMIX(S3, S4, S5, S6);
+    CMIX36(S0, S1, S2, S4, S5, S6, S18, S19, S20);
+    SMIX(S0, S1, S2, S3);
+    // x
+    TIX4(my_dec32be(cdata+12), S0, S1, S4, S7, S8, S22, S24, S27, S30);
+    CMIX36(S33, S34, S35, S1, S2, S3, S15, S16, S17);
+    SMIX(S33, S34, S35, S0);
+    CMIX36(S30, S31, S32, S34, S35, S0, S12, S13, S14);
+    SMIX(S30, S31, S32, S33);
+    CMIX36(S27, S28, S29, S31, S32, S33, S9, S10, S11);
+    SMIX(S27, S28, S29, S30);
+    CMIX36(S24, S25, S26, S28, S29, S30, S6, S7, S8);
+    SMIX(S24, S25, S26, S27);
+    /* fall through */
+    TIX4(my_dec32be(cdata+16), S24, S25, S28, S31, S32, S10, S12, S15, S18);
+    CMIX36(S21, S22, S23, S25, S26, S27, S3, S4, S5);
+    SMIX(S21, S22, S23, S24);
+    CMIX36(S18, S19, S20, S22, S23, S24, S0, S1, S2);
+    SMIX(S18, S19, S20, S21);
+    CMIX36(S15, S16, S17, S19, S20, S21, S33, S34, S35);
+    SMIX(S15, S16, S17, S18);
+    CMIX36(S12, S13, S14, S16, S17, S18, S30, S31, S32);
+    SMIX(S12, S13, S14, S15);
+    /* fall through */
+    TIX4(my_dec32be(cdata+20), S12, S13, S16, S19, S20, S34, S0, S3, S6);
+    CMIX36(S9, S10, S11, S13, S14, S15, S27, S28, S29);
+    SMIX(S9, S10, S11, S12);
+    CMIX36(S6, S7, S8, S10, S11, S12, S24, S25, S26);
+    SMIX(S6, S7, S8, S9);
+    CMIX36(S3, S4, S5, S7, S8, S9, S21, S22, S23);
+    SMIX(S3, S4, S5, S6);
+    CMIX36(S0, S1, S2, S4, S5, S6, S18, S19, S20);
+    SMIX(S0, S1, S2, S3);
+    TIX4(my_dec32be(cdata+24), S0, S1, S4, S7, S8, S22, S24, S27, S30);
+    CMIX36(S33, S34, S35, S1, S2, S3, S15, S16, S17);
+    SMIX(S33, S34, S35, S0);
+    CMIX36(S30, S31, S32, S34, S35, S0, S12, S13, S14);
+    SMIX(S30, S31, S32, S33);
+    CMIX36(S27, S28, S29, S31, S32, S33, S9, S10, S11);
+    SMIX(S27, S28, S29, S30);
+    CMIX36(S24, S25, S26, S28, S29, S30, S6, S7, S8);
+    SMIX(S24, S25, S26, S27);
+    /* fall through */
+    TIX4(my_dec32be(cdata+28), S24, S25, S28, S31, S32, S10, S12, S15, S18);
+    CMIX36(S21, S22, S23, S25, S26, S27, S3, S4, S5);
+    SMIX(S21, S22, S23, S24);
+    CMIX36(S18, S19, S20, S22, S23, S24, S0, S1, S2);
+    SMIX(S18, S19, S20, S21);
+    CMIX36(S15, S16, S17, S19, S20, S21, S33, S34, S35);
+    SMIX(S15, S16, S17, S18);
+    CMIX36(S12, S13, S14, S16, S17, S18, S30, S31, S32);
+    SMIX(S12, S13, S14, S15);
+    /* fall through */
+    TIX4(my_dec32be(cdata+32), S12, S13, S16, S19, S20, S34, S0, S3, S6);
+    CMIX36(S9, S10, S11, S13, S14, S15, S27, S28, S29);
+    SMIX(S9, S10, S11, S12);
+    CMIX36(S6, S7, S8, S10, S11, S12, S24, S25, S26);
+    SMIX(S6, S7, S8, S9);
+    CMIX36(S3, S4, S5, S7, S8, S9, S21, S22, S23);
+    SMIX(S3, S4, S5, S6);
+    CMIX36(S0, S1, S2, S4, S5, S6, S18, S19, S20);
+    SMIX(S0, S1, S2, S3);
+    // x
+    TIX4(my_dec32be(cdata+36), S0, S1, S4, S7, S8, S22, S24, S27, S30);
+    CMIX36(S33, S34, S35, S1, S2, S3, S15, S16, S17);
+    SMIX(S33, S34, S35, S0);
+    CMIX36(S30, S31, S32, S34, S35, S0, S12, S13, S14);
+    SMIX(S30, S31, S32, S33);
+    CMIX36(S27, S28, S29, S31, S32, S33, S9, S10, S11);
+    SMIX(S27, S28, S29, S30);
+    CMIX36(S24, S25, S26, S28, S29, S30, S6, S7, S8);
+    SMIX(S24, S25, S26, S27);
+    /* fall through */
+    TIX4(my_dec32be(cdata+40), S24, S25, S28, S31, S32, S10, S12, S15, S18);
+    CMIX36(S21, S22, S23, S25, S26, S27, S3, S4, S5);
+    SMIX(S21, S22, S23, S24);
+    CMIX36(S18, S19, S20, S22, S23, S24, S0, S1, S2);
+    SMIX(S18, S19, S20, S21);
+    CMIX36(S15, S16, S17, S19, S20, S21, S33, S34, S35);
+    SMIX(S15, S16, S17, S18);
+    CMIX36(S12, S13, S14, S16, S17, S18, S30, S31, S32);
+    SMIX(S12, S13, S14, S15);
+    /* fall through */
+    TIX4(my_dec32be(cdata+44), S12, S13, S16, S19, S20, S34, S0, S3, S6);
+    CMIX36(S9, S10, S11, S13, S14, S15, S27, S28, S29);
+    SMIX(S9, S10, S11, S12);
+    CMIX36(S6, S7, S8, S10, S11, S12, S24, S25, S26);
+    SMIX(S6, S7, S8, S9);
+    CMIX36(S3, S4, S5, S7, S8, S9, S21, S22, S23);
+    SMIX(S3, S4, S5, S6);
+    CMIX36(S0, S1, S2, S4, S5, S6, S18, S19, S20);
+    SMIX(S0, S1, S2, S3);
+    // x
+    TIX4(my_dec32be(cdata+48), S0, S1, S4, S7, S8, S22, S24, S27, S30);
+    CMIX36(S33, S34, S35, S1, S2, S3, S15, S16, S17);
+    SMIX(S33, S34, S35, S0);
+    CMIX36(S30, S31, S32, S34, S35, S0, S12, S13, S14);
+    SMIX(S30, S31, S32, S33);
+    CMIX36(S27, S28, S29, S31, S32, S33, S9, S10, S11);
+    SMIX(S27, S28, S29, S30);
+    CMIX36(S24, S25, S26, S28, S29, S30, S6, S7, S8);
+    SMIX(S24, S25, S26, S27);
+    /* fall through */
+    TIX4(my_dec32be(cdata+52), S24, S25, S28, S31, S32, S10, S12, S15, S18);
+    CMIX36(S21, S22, S23, S25, S26, S27, S3, S4, S5);
+    SMIX(S21, S22, S23, S24);
+    CMIX36(S18, S19, S20, S22, S23, S24, S0, S1, S2);
+    SMIX(S18, S19, S20, S21);
+    CMIX36(S15, S16, S17, S19, S20, S21, S33, S34, S35);
+    SMIX(S15, S16, S17, S18);
+    CMIX36(S12, S13, S14, S16, S17, S18, S30, S31, S32);
+    SMIX(S12, S13, S14, S15);
+    /* fall through */
+    TIX4(my_dec32be(cdata+56), S12, S13, S16, S19, S20, S34, S0, S3, S6);
+    CMIX36(S9, S10, S11, S13, S14, S15, S27, S28, S29);
+    SMIX(S9, S10, S11, S12);
+    CMIX36(S6, S7, S8, S10, S11, S12, S24, S25, S26);
+    SMIX(S6, S7, S8, S9);
+    CMIX36(S3, S4, S5, S7, S8, S9, S21, S22, S23);
+    SMIX(S3, S4, S5, S6);
+    CMIX36(S0, S1, S2, S4, S5, S6, S18, S19, S20);
+    SMIX(S0, S1, S2, S3);
+    // moved from close
+    TIX4(my_dec32be(cdata+60), S0, S1, S4, S7, S8, S22, S24, S27, S30);
+    CMIX36(S33, S34, S35, S1, S2, S3, S15, S16, S17);
+    SMIX(S33, S34, S35, S0);
+    CMIX36(S30, S31, S32, S34, S35, S0, S12, S13, S14);
+    SMIX(S30, S31, S32, S33);
+    CMIX36(S27, S28, S29, S31, S32, S33, S9, S10, S11);
+    SMIX(S27, S28, S29, S30);
+    CMIX36(S24, S25, S26, S28, S29, S30, S6, S7, S8);
+    SMIX(S24, S25, S26, S27);
+    /* fall through */
+    TIX4(0, S24, S25, S28, S31, S32, S10, S12, S15, S18);
+    CMIX36(S21, S22, S23, S25, S26, S27, S3, S4, S5);
+    SMIX(S21, S22, S23, S24);
+    CMIX36(S18, S19, S20, S22, S23, S24, S0, S1, S2);
+    SMIX(S18, S19, S20, S21);
+    CMIX36(S15, S16, S17, S19, S20, S21, S33, S34, S35);
+    SMIX(S15, S16, S17, S18);
+    CMIX36(S12, S13, S14, S16, S17, S18, S30, S31, S32);
+    SMIX(S12, S13, S14, S15);
+    /* fall through */
+    TIX4(512, S12, S13, S16, S19, S20, S34, S0, S3, S6);
+    CMIX36(S9, S10, S11, S13, S14, S15, S27, S28, S29);
+    SMIX(S9, S10, S11, S12);
+    CMIX36(S6, S7, S8, S10, S11, S12, S24, S25, S26);
+    SMIX(S6, S7, S8, S9);
+    CMIX36(S3, S4, S5, S7, S8, S9, S21, S22, S23);
+    SMIX(S3, S4, S5, S6);
+    CMIX36(S0, S1, S2, S4, S5, S6, S18, S19, S20);
+    SMIX(S0, S1, S2, S3);
+
+
     // METIS CLOSE
     int i;
-	unsigned char *out;
-    
+    unsigned char *out;
+
     #pragma unroll
     for (i = 0; i < 2; i++) {
         // i =  0, 12
@@ -485,7 +494,7 @@ void metis_core_and_close(metis_context *sc, const void *vdata, void *dst,
     CMIX36(S12, S13, S14, S16, S17, S18, S30, S31, S32);
     SMIX(S12, S13, S14, S15);
 
-    
+
     // i = 0
     S16 ^= S12; S21 ^= S12; S30 ^= S12;  S3 ^= S12;
     SMIX( S3,  S4,  S5,  S6);

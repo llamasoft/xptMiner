@@ -15,11 +15,13 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo) {
     this->algorithm = algo;
 	this->device_num = _device_num;
 
-	printf("Initializing GPU %d\n", device_num);
+	printf("Initializing GPU %d\n\n", device_num);
 	OpenCLMain &main = OpenCLMain::getInstance();
 	OpenCLDevice* device = main.getDevice(device_num);
 
-	printf("Initializing Device: %s\n", device->getName().c_str());
+    printf("============================================================\n");
+	printf("Device information for: %s\n", device->getName().c_str());
+    device->dumpDeviceInfo(); // Makes troubleshooting easier
     printf("\n");
 	printf("Compiling OpenCL code... this may take 3-5 minutes\n");
 	std::vector<std::string> file_list;
@@ -33,8 +35,7 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo) {
 	kernel_keccak_noinit = program->getKernel("keccak_step_noinit");
 	kernel_shavite = program->getKernel("shavite_step");
 	kernel_metis = program->getKernel("metis_step");
-
-	main.listDevices();
+    
 
 	u = device->getContext()->createBuffer(25*sizeof(cl_ulong), CL_MEM_READ_WRITE, NULL);
 	buff = device->getContext()->createBuffer(4, CL_MEM_READ_WRITE, NULL);

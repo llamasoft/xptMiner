@@ -205,14 +205,36 @@ cl_device_id OpenCLDevice::getDeviceId() {
 	return my_id;
 }
 
+void OpenCLDevice::dumpDeviceInfo() {
+    size_t   param_size_ret;
+    cl_uint  uint_rtn;
+    cl_ulong ulong_rtn;
+
+    check_error(clGetDeviceInfo(my_id, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &ulong_rtn, NULL));
+    printf("%-35s %9lu kb\n", "CL_DEVICE_GLOBAL_MEM_SIZE:", ulong_rtn / 1024);
+
+    check_error(clGetDeviceInfo(my_id, CL_DEVICE_GLOBAL_MEM_CACHE_SIZE, sizeof(cl_ulong), &ulong_rtn, NULL));
+    printf("%-35s %9lu kb\n", "CL_DEVICE_GLOBAL_MEM_CACHE_SIZE:", ulong_rtn / 1024);
+
+    check_error(clGetDeviceInfo(my_id, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &ulong_rtn, NULL));
+    printf("%-35s %9lu kb\n", "CL_DEVICE_LOCAL_MEM_SIZE:", ulong_rtn / 1024);
+
+    check_error(clGetDeviceInfo(my_id, CL_DEVICE_LOCAL_MEM_TYPE, sizeof(cl_uint), &uint_rtn, NULL));
+    printf("%-35s %s\n", "CL_DEVICE_LOCAL_MEM_TYPE:", (uint_rtn == CL_LOCAL ? "CL_LOCAL" : (uint_rtn == CL_GLOBAL ? "CL_GLOBAL" : "CL_NONE")));
+
+    check_error(clGetDeviceInfo(my_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &ulong_rtn, NULL));
+    printf("%-35s %9lu\n", "CL_DEVICE_MAX_WORK_GROUP_SIZE:", ulong_rtn);
+}
 
 std::string OpenCLDevice::getName() {
 	size_t param_value_size_ret;
 	check_error(clGetDeviceInfo(my_id, CL_DEVICE_NAME, 0, NULL, &param_value_size_ret));
 	char *name = new char[param_value_size_ret];
 	check_error(clGetDeviceInfo(my_id, CL_DEVICE_NAME, param_value_size_ret, name, NULL));
-	return std::string(name);
+	
+    std::string rtn(name);
     delete[] name;
+    return rtn;
 }
 
 long OpenCLDevice::getMaxWorkGroupSize() {
@@ -295,6 +317,7 @@ OpenCLProgram* OpenCLContext::loadProgramFromFiles(std::vector<std::string> file
         assert(file.good());
 		std::string file_str((std::istreambuf_iterator<char>(file)),
 		                 std::istreambuf_iterator<char>());
+        file_str.append("\n");
 		file_strs.push_back(file_str);
 	}
 	return loadProgramFromStrings(file_strs);
