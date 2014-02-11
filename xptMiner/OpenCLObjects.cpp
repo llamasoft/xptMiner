@@ -207,6 +207,7 @@ cl_device_id OpenCLDevice::getDeviceId() {
 
 void OpenCLDevice::dumpDeviceInfo() {
     size_t   param_size_ret;
+    char*    str_rtn;
     cl_uint  uint_rtn;
     cl_ulong ulong_rtn;
 
@@ -220,16 +221,28 @@ void OpenCLDevice::dumpDeviceInfo() {
     printf("%-35s %9lu kb\n", "CL_DEVICE_LOCAL_MEM_SIZE:", ulong_rtn / 1024);
 
     check_error(clGetDeviceInfo(my_id, CL_DEVICE_LOCAL_MEM_TYPE, sizeof(cl_uint), &uint_rtn, NULL));
-    printf("%-35s %s\n", "CL_DEVICE_LOCAL_MEM_TYPE:", (uint_rtn == CL_LOCAL ? "CL_LOCAL" : (uint_rtn == CL_GLOBAL ? "CL_GLOBAL" : "CL_NONE")));
+    printf("%-35s %9s\n", "CL_DEVICE_LOCAL_MEM_TYPE:", (uint_rtn == CL_LOCAL ? "CL_LOCAL" : (uint_rtn == CL_GLOBAL ? "CL_GLOBAL" : "CL_NONE")));
 
     check_error(clGetDeviceInfo(my_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &ulong_rtn, NULL));
     printf("%-35s %9lu\n", "CL_DEVICE_MAX_WORK_GROUP_SIZE:", ulong_rtn);
+
+    check_error(clGetDeviceInfo(my_id, CL_DEVICE_ENDIAN_LITTLE, sizeof(cl_uint), &uint_rtn, NULL));
+    printf("%-35s %9lu\n", "CL_DEVICE_ENDIAN_LITTLE:", (uint_rtn > 0));
+
+    check_error(clGetDeviceInfo(my_id, CL_DEVICE_ADDRESS_BITS, sizeof(cl_uint), &uint_rtn, NULL));
+    printf("%-35s %9lu\n", "CL_DEVICE_ADDRESS_BITS:", uint_rtn);
+
+    check_error(clGetDeviceInfo(my_id, CL_DEVICE_OPENCL_C_VERSION, 0, NULL, &param_size_ret));
+    str_rtn = new char[param_size_ret + 1];
+    check_error(clGetDeviceInfo(my_id, CL_DEVICE_OPENCL_C_VERSION, param_size_ret, str_rtn, NULL));
+    printf("%-35s %9s\n", "CL_DEVICE_OPENCL_C_VERSION:", str_rtn);
+    delete[] str_rtn;
 }
 
 std::string OpenCLDevice::getName() {
 	size_t param_value_size_ret;
 	check_error(clGetDeviceInfo(my_id, CL_DEVICE_NAME, 0, NULL, &param_value_size_ret));
-	char *name = new char[param_value_size_ret];
+	char *name = new char[param_value_size_ret + 1];
 	check_error(clGetDeviceInfo(my_id, CL_DEVICE_NAME, param_value_size_ret, name, NULL));
 	
     std::string rtn(name);
@@ -307,7 +320,7 @@ OpenCLProgram::~OpenCLProgram() {
 	clReleaseProgram(program);
 }
 
-OpenCLProgram* OpenCLContext::loadProgramFromFiles(std::vector<std::string> filenames) {
+OpenCLProgram* OpenCLContext::loadProgramFromFiles(std::vector<std::string> filenames, std::string params) {
 	std::vector<std::string> file_strs;
 	for (int i = 0; i < filenames.size(); i++) {
 		std::ifstream file (filenames[i].c_str());
@@ -320,10 +333,10 @@ OpenCLProgram* OpenCLContext::loadProgramFromFiles(std::vector<std::string> file
         file_str.append("\n");
 		file_strs.push_back(file_str);
 	}
-	return loadProgramFromStrings(file_strs);
+	return loadProgramFromStrings(file_strs, params);
 }
 
-OpenCLProgram* OpenCLContext::loadProgramFromStrings(std::vector<std::string> file_strs) {
+OpenCLProgram* OpenCLContext::loadProgramFromStrings(std::vector<std::string> file_strs, std::string params) {
     // Unsure about this
 	const char **str_ptr = new const char*[file_strs.size()];
 	size_t *size_ptr = new size_t[file_strs.size()];
@@ -337,7 +350,7 @@ OpenCLProgram* OpenCLContext::loadProgramFromStrings(std::vector<std::string> fi
 	check_error(error);
 
 	// build for all devices, I can implement different devices later;
-	error = clBuildProgram(program, 0, NULL, "", NULL, NULL);
+    error = clBuildProgram(program, 0, NULL, params.c_str(), NULL, NULL);
 	if (error) {
 		print_err_msg(error);
 		// uses first device for error messages

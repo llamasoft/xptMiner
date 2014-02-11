@@ -120,8 +120,8 @@ public:
 	OpenCLContext(cl_context _context, OpenCLDevice* _device);
 	~OpenCLContext();
 
-	OpenCLProgram * loadProgramFromFiles(std::vector<std::string> filename);
-	OpenCLProgram * loadProgramFromStrings(std::vector<std::string> program);
+	OpenCLProgram * loadProgramFromFiles(std::vector<std::string> filename, std::string params);
+	OpenCLProgram * loadProgramFromStrings(std::vector<std::string> program, std::string params);
 
 	OpenCLCommandQueue* createCommandQueue(int deviceIndex=0);
 	OpenCLCommandQueue* createCommandQueue(OpenCLDevice* device);

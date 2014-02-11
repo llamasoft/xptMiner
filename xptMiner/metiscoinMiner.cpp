@@ -19,9 +19,10 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo) {
 	OpenCLMain &main = OpenCLMain::getInstance();
 	OpenCLDevice* device = main.getDevice(device_num);
 
-    printf("============================================================\n");
+    printf("======================================================================\n");
 	printf("Device information for: %s\n", device->getName().c_str());
     device->dumpDeviceInfo(); // Makes troubleshooting easier
+    printf("======================================================================\n");
     printf("\n");
 	printf("Compiling OpenCL code... this may take 3-5 minutes\n");
 	std::vector<std::string> file_list;
@@ -29,7 +30,7 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo) {
 	file_list.push_back("opencl/shavite.cl");
 	file_list.push_back("opencl/metis.cl");
 	file_list.push_back("opencl/miner.cl");
-	OpenCLProgram* program = device->getContext()->loadProgramFromFiles(file_list);
+	OpenCLProgram* program = device->getContext()->loadProgramFromFiles(file_list, "");
 
 	kernel_all = program->getKernel("metiscoin_process");
 	kernel_keccak_noinit = program->getKernel("keccak_step_noinit");

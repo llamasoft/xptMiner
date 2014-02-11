@@ -1,3 +1,6 @@
+#ifndef __ENDIAN_LITTLE__
+#error Your device is not little endian.  Only little endian devices are supported at this time.
+#endif
 
 #pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
 #ifdef _ECLIPSE_OPENCL_HEADER
