@@ -11,8 +11,8 @@
 char* minerVersionString = "xptMiner 1.4gg";
 
 volatile uint64 totalCollisionCount;
-volatile uint64 totalShareCount;
-volatile uint64 invalidShareCount;
+volatile uint32 totalShareCount;
+volatile uint32 invalidShareCount;
 volatile uint32 monitorCurrentBlockHeight;
 
 minerSettings_t minerSettings = {0};
