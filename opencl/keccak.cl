@@ -30,7 +30,7 @@ constant ulong RC[] __attribute__ ((aligned)) = {
     SPH_C64(0x0000000080000001), SPH_C64(0x8000000080008008)
 };
 
-
+//#define SPH_KECCAK_NOCOPY
 #ifdef SPH_KECCAK_NOCOPY
 
 #define a00   (kc->u.wide[ 0])

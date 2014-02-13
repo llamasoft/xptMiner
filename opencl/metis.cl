@@ -19,7 +19,7 @@ typedef struct {
     uint round_shift;
 } __attribute__ ((aligned)) metis_context;
 
-#define METIS_NOCOPY
+//#define METIS_NOCOPY
 #ifdef METIS_NOCOPY
 
 #define  S0 S[ 0]
@@ -109,13 +109,43 @@ typedef struct {
 void metis_init(metis_context* sc) {
     size_t u;
 
-#pragma unroll
-    for (u = 0; u < 20; u ++)
-        sc->S[u] = 0;
-#pragma unroll
-    for (int i = 0; i < 16; i++) {
-        sc->S[20+i] = IV512metis[i];
-    }
+    sc->S[ 0] = 0;
+    sc->S[ 1] = 0;
+    sc->S[ 2] = 0;
+    sc->S[ 3] = 0;
+    sc->S[ 4] = 0;
+    sc->S[ 5] = 0;
+    sc->S[ 6] = 0;
+    sc->S[ 7] = 0;
+    sc->S[ 8] = 0;
+    sc->S[ 9] = 0;
+    sc->S[10] = 0;
+    sc->S[11] = 0;
+    sc->S[12] = 0;
+    sc->S[13] = 0;
+    sc->S[14] = 0;
+    sc->S[15] = 0;
+    sc->S[16] = 0;
+    sc->S[17] = 0;
+    sc->S[18] = 0;
+    sc->S[19] = 0;
+    sc->S[20] = 0x8807A57E;
+    sc->S[21] = 0xE616AF75;
+    sc->S[22] = 0xC5D3E4DB;
+    sc->S[23] = 0xAC9AB027;
+    sc->S[24] = 0xD915F117;
+    sc->S[25] = 0xB6EECC54;
+    sc->S[26] = 0x06E8020B;
+    sc->S[27] = 0x4A92EFD1;
+    sc->S[28] = 0xAAC6E2C9;
+    sc->S[29] = 0xDDB21398;
+    sc->S[30] = 0xCAE65838;
+    sc->S[31] = 0x437F203F;
+    sc->S[32] = 0x25EA78E7;
+    sc->S[33] = 0x951FDDD6;
+    sc->S[34] = 0xDA6ED11D;
+    sc->S[35] = 0xE13E3567;
+    
     sc->partial = 0;
     sc->partial_len = 0;
     sc->round_shift = 0;
@@ -235,10 +265,10 @@ enc32be(void *dst, uint val)
 
 
 void metis_core_and_close(metis_context *sc, const void *vdata, void *dst,
-                          local uint* METIS_LOOKUP0,
-                          local uint* METIS_LOOKUP1,
-                          local uint* METIS_LOOKUP2,
-                          local uint* METIS_LOOKUP3
+                          local uint* restrict METIS_LOOKUP0,
+                          local uint* restrict METIS_LOOKUP1,
+                          local uint* restrict METIS_LOOKUP2,
+                          local uint* restrict METIS_LOOKUP3
                           )
 {
     const unsigned char * cdata = (const unsigned char *)vdata;

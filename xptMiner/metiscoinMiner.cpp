@@ -6,16 +6,16 @@
 #include "sph_metis.h"
 #include "aes_helper.h"
 
-#define STEP_SIZE 0x80000
-#define NUM_STEPS 0x100
+#define MAX_NONCE 0x8000000
 // #define MEASURE_TIME 1
 
 
-MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo) {
-    this->algorithm = algo;
+MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo, uint32 _step_size) {
+    this->algorithm  = algo;
 	this->device_num = _device_num;
+    this->step_size  = (_step_size < MAX_NONCE ? _step_size : MAX_NONCE);
 
-	printf("Initializing GPU %d\n\n", device_num);
+	printf("Initializing GPU %d\n", device_num);
 	OpenCLMain &main = OpenCLMain::getInstance();
 	OpenCLDevice* device = main.getDevice(device_num);
 
@@ -41,7 +41,7 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo) {
 	u = device->getContext()->createBuffer(25*sizeof(cl_ulong), CL_MEM_READ_WRITE, NULL);
 	buff = device->getContext()->createBuffer(4, CL_MEM_READ_WRITE, NULL);
 
-	hashes = device->getContext()->createBuffer(64 * STEP_SIZE, CL_MEM_READ_WRITE, NULL);
+	hashes = device->getContext()->createBuffer(64 * step_size, CL_MEM_READ_WRITE, NULL);
 	out = device->getContext()->createBuffer(sizeof(cl_uint) * 255, CL_MEM_READ_WRITE, NULL);
 	out_count = device->getContext()->createBuffer(sizeof(cl_uint), CL_MEM_READ_WRITE, NULL);
 
@@ -55,7 +55,6 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo) {
     shavite_AES2 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)AES2);
     shavite_AES3 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)AES3);
 
-
 	q = device->getContext()->createCommandQueue(device);
 }
 
@@ -66,11 +65,11 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 	block->nonce = 0;
 	uint32 target = *(uint32*)(block->targetShare+28);
 	OpenCLDevice* device = OpenCLMain::getInstance().getDevice(device_num);
-	//printf("processing block with Device: %s\n", device->getName().c_str());
 
+	uint32 num_steps = MAX_NONCE / step_size;
 
 	// measure time
-	for (uint32 n = 0; n < NUM_STEPS; n++)
+	for (uint32 n = 0; n < num_steps; n++)
 	{
 #ifdef MEASURE_TIME
 		uint32 begin = getTimeMilliseconds();
@@ -96,12 +95,12 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		    kernel_keccak_noinit->addGlobalArg(u);
 		    kernel_keccak_noinit->addGlobalArg(buff);
 		    kernel_keccak_noinit->addGlobalArg(hashes);
-		    kernel_keccak_noinit->addScalarUInt(n * STEP_SIZE);
+		    kernel_keccak_noinit->addScalarUInt(n * step_size);
 
 		    q->enqueueWriteBuffer(u, ctx_keccak.u.wide, 25*sizeof(cl_ulong));
 		    q->enqueueWriteBuffer(buff, ctx_keccak.buf, 4);
-		    q->enqueueKernel1D(kernel_keccak_noinit, STEP_SIZE,
-				    kernel_keccak_noinit->getWorkGroupSize(device));
+
+		    q->enqueueKernel1D(kernel_keccak_noinit, step_size, kernel_keccak_noinit->getWorkGroupSize(device));
 
 #ifdef MEASURE_TIME
 		q->finish();
@@ -116,7 +115,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
             kernel_shavite->addGlobalArg(shavite_AES2);
             kernel_shavite->addGlobalArg(shavite_AES3);
 
-		    q->enqueueKernel1D(kernel_shavite, STEP_SIZE, kernel_shavite->getWorkGroupSize(device));
+		    q->enqueueKernel1D(kernel_shavite, step_size, kernel_shavite->getWorkGroupSize(device));
 
 #ifdef MEASURE_TIME
 		q->finish();
@@ -127,7 +126,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		    kernel_metis->addGlobalArg(hashes);
 		    kernel_metis->addGlobalArg(out);
 		    kernel_metis->addGlobalArg(out_count);
-		    kernel_metis->addScalarUInt(n*STEP_SIZE);
+		    kernel_metis->addScalarUInt(n * step_size);
 		    kernel_metis->addScalarUInt(target);
 
             kernel_metis->addGlobalArg(metis_mixtab0);
@@ -137,8 +136,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 
 		    q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 
-		    q->enqueueKernel1D(kernel_metis, STEP_SIZE,
-				    kernel_metis->getWorkGroupSize(device));
+		    q->enqueueKernel1D(kernel_metis, step_size, kernel_metis->getWorkGroupSize(device));
 
         // Algorithm 2
         // Do all hashing in one pass
@@ -149,7 +147,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		    kernel_all->addGlobalArg(buff);
 		    kernel_all->addGlobalArg(out);
 		    kernel_all->addGlobalArg(out_count);
-            kernel_all->addScalarUInt(n * STEP_SIZE);
+            kernel_all->addScalarUInt(n * step_size);
 		    kernel_all->addScalarUInt(target);
             kernel_all->addGlobalArg(shavite_AES0);
             kernel_all->addGlobalArg(shavite_AES1);
@@ -166,7 +164,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
             q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 
             // Run
-            q->enqueueKernel1D(kernel_all, STEP_SIZE, kernel_all->getWorkGroupSize(device));
+            q->enqueueKernel1D(kernel_all, step_size, kernel_all->getWorkGroupSize(device));
         }
 
 		q->enqueueReadBuffer(out, out_tmp, sizeof(cl_uint) * 255);
@@ -179,7 +177,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 			xptMiner_submitShare(block);
 		}
 
-		totalCollisionCount += STEP_SIZE;
+		totalCollisionCount += 1;
 #ifdef MEASURE_TIME
 		uint32 end = getTimeMilliseconds();
 		printf("Elapsed time: %d ms (k = %d, s = %d, m = %d)\n", (end-begin), (end_keccak-begin), (end_shavite-end_keccak), (end-end_shavite));

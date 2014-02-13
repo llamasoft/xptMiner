@@ -1,4 +1,4 @@
-#include "global.h"
+﻿#include "global.h"
 #include "ticker.h"
 #include "OpenCLObjects.h"
 #include "metiscoinMiner.h"
@@ -8,9 +8,9 @@
 #define MAX_TRANSACTIONS	(4096)
 
 // miner version string (for pool statistic)
-char* minerVersionString = "xptMiner 1.4gg";
+char* minerVersionString = "xptMiner 1.5gg";
 
-volatile uint64 totalCollisionCount;
+volatile uint32 totalCollisionCount;
 volatile uint32 totalShareCount;
 volatile uint32 invalidShareCount;
 volatile uint32 monitorCurrentBlockHeight;
@@ -48,6 +48,29 @@ uint32 uniqueMerkleSeedGenerator = 0;
 uint32 miningStartTime = 0;
 
 std::vector<MetiscoinOpenCL *> gpu_processors;
+
+typedef struct  
+{
+    char* workername;
+    char* workerpass;
+    char* host;
+    sint32 port;
+    sint32 numThreads;
+    uint32 ptsMemoryMode;
+    // GPU / OpenCL options
+    uint32 deviceNum;
+    bool listDevices;
+    std::vector<int> deviceList;
+
+    // mode option
+    uint32 mode;
+    float donationPercent;
+    int algorithm;
+    uint32 step_size;
+} commandlineInput_t;
+
+commandlineInput_t commandlineInput;
+
 
 /*
  * Submit Protoshares share
@@ -228,7 +251,7 @@ void *xptMiner_minerThread(void *arg)
                 hasValidWork = true;
             }
         }
-LeaveCriticalSection(&workDataSource.cs_work);
+        LeaveCriticalSection(&workDataSource.cs_work);
         if( hasValidWork == false )
         {
             Sleep(1);
@@ -316,6 +339,7 @@ void xptMiner_xptQueryWorkLoop()
         // GigaWatt
         xptClient_addDeveloperFeeEntry(xptClient, "MEu8jBkkVvTLwvpiPjWC9YntyDH2u5KwVy", getFeeFromDouble(minerSettings.requestTarget.donationPercent * 2.0 / 3.0));
     }
+
     uint32 timerPrintDetails = getTimeMilliseconds() + 8000;
     while( true )
     {
@@ -327,14 +351,20 @@ void xptMiner_xptQueryWorkLoop()
             {
                 uint32 passedSeconds = (uint32)time(NULL) - miningStartTime;
                 double speedRate = 0.0;
+				double sharesPerHour = 0.0;
                 if( workDataSource.algorithm == ALGORITHM_METISCOIN )
                 {
                   // speed is represented as khash/s (in steps of 0x8000)
-                  if( passedSeconds > 5 )
-                  {
-                    speedRate = (double)totalCollisionCount / (double)passedSeconds / 1000.0;
-                  }
-                  printf("kHash/s: %.2lf Shares total: %ld (Valid: %ld, Invalid: %ld)\n", speedRate, totalShareCount, (totalShareCount-invalidShareCount), invalidShareCount);
+                  if( passedSeconds > 5 ) {
+                      speedRate = (double)totalCollisionCount * (double)(commandlineInput.step_size) / (double)passedSeconds / 1000.0;
+					  printf("kHash/s: %.2lf Shares total: %ld (Valid: %ld, Invalid: %ld", speedRate, totalShareCount, (totalShareCount-invalidShareCount), invalidShareCount);
+				  }
+
+				  if ( passedSeconds > 600 ) {
+					  sharesPerHour = (double)totalShareCount / (double)passedSeconds * 3600.0;
+					  printf(", PerHour: %.2f", sharesPerHour);
+				  }
+				  printf(")\n");
                 }
 
             }
@@ -411,28 +441,6 @@ void xptMiner_xptQueryWorkLoop()
 }
 
 
-typedef struct  
-{
-    char* workername;
-    char* workerpass;
-    char* host;
-    sint32 port;
-    sint32 numThreads;
-    uint32 ptsMemoryMode;
-    // GPU / OpenCL options
-    uint32 deviceNum;
-    bool listDevices;
-    std::vector<int> deviceList;
-
-    // mode option
-    uint32 mode;
-    float donationPercent;
-    int algorithm;
-} commandlineInput_t;
-
-commandlineInput_t commandlineInput;
-
-
 void xptMiner_printHelp()
 {
     puts("Usage: xptMiner.exe [options]");
@@ -444,6 +452,9 @@ void xptMiner_printHelp()
     puts("   -t <num>             The number of threads for mining (default is 1)");
     puts("   -f <num>             Donation amount for dev (default donates 3.0% to dev)");
     puts("   -a <num>             The algorithm variant to use (1 or 2, default is 1)");
+	puts("   -s <num>             The step factor for GPU mining (integer between -4 and 8, default is 0)");
+	puts("                        Determines the number of hashes per step: 0x80000 * 2^X");
+	puts("                            e.g.: -1 = half the work per pass, 1 = twice the work per pass");
     puts("   -d <num>,<num>,...   List of GPU devices to use (default is 0).");
     puts("Example usage:");
     puts("  xptminer.exe -o ypool.net -u workername.mtc_1 -p pass -d 0");
@@ -456,6 +467,7 @@ void xptMiner_parseCommandline(int argc, char **argv)
     // Default values
     commandlineInput.donationPercent = 3.0f;
     commandlineInput.algorithm = 1;
+	int step_factor = 0;
 
     while( cIdx < argc )
     {
@@ -594,6 +606,22 @@ void xptMiner_parseCommandline(int argc, char **argv)
             commandlineInput.algorithm = algo;
             cIdx++;
         }
+        else if( memcmp(argument, "-s", 2)==0 )
+        {
+            if ( cIdx >= argc )
+            {
+                printf("Missing step factor number after %s option\n", argument);
+                exit(0);
+            }
+
+            step_factor = atoi(argv[cIdx]);
+            if (step_factor < -4 || step_factor > 8)
+            {
+                printf("Step factor '%d' is invalid.  Valid algorithm values are between -4 and 8.\n", step_factor);
+                exit(0);
+            }
+            cIdx++;
+        }
         else if( memcmp(argument, "-help", 6)==0 || memcmp(argument, "--help", 7)==0 )
         {
             xptMiner_printHelp();
@@ -610,6 +638,10 @@ void xptMiner_parseCommandline(int argc, char **argv)
         xptMiner_printHelp();
         exit(0);
     }
+
+	commandlineInput.step_size = 0x80000;
+	if (step_factor > 0) { commandlineInput.step_size <<= step_factor; }
+	if (step_factor < 0) { commandlineInput.step_size >>= (-1 * step_factor); }
 }
 
 
@@ -658,7 +690,7 @@ int main(int argc, char** argv)
     minerSettings.protoshareMemoryMode = commandlineInput.ptsMemoryMode;
     printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
     printf("\xBA                                                  \xBA\n");
-    printf("\xBA  xptMiner (v1.1) + GPU Metiscoin Miner (v0.3gg)  \xBA\n");
+    printf("\xBA  xptMiner (v1.1) + GPU Metiscoin Miner (v0.4gg)  \xBA\n");
     printf("\xBA  Author: Girino   (GPU Metiscoin Miner)          \xBA\n");
     printf("\xBA          GigaWatt (GPU Optimizations)            \xBA\n");
     printf("\xBA          jh00     (xptMiner)                     \xBA\n");
@@ -678,6 +710,8 @@ int main(int argc, char** argv)
     //printf("Using %d megabytes of memory per thread\n", mbTable[min(commandlineInput.ptsMemoryMode,(sizeof(mbTable)/sizeof(mbTable[0])))]);
     printf("Using %d threads\n", commandlineInput.numThreads);
     printf("Using algorithm variant %d\n", commandlineInput.algorithm);
+    printf("Using step size: %#x\n", commandlineInput.step_size);
+    printf("\n");
     
 #ifdef _WIN32
     // set priority to below normal
@@ -725,16 +759,22 @@ int main(int argc, char** argv)
     } else {
         commandlineInput.numThreads = commandlineInput.deviceList.size();
     }
+    printf("\n");
     printf("Adjusting num threads to match device list: %d\n", commandlineInput.numThreads);
 
     // inits all GPU devices
+    printf("\n");
     printf("Initializing workers...\n");
     for (int i = 0; i < commandlineInput.deviceList.size(); i++) {
         printf("Initing device %d...\n", i);
-        gpu_processors.push_back(new MetiscoinOpenCL(commandlineInput.deviceList[i], commandlineInput.algorithm));
+        gpu_processors.push_back(new MetiscoinOpenCL(commandlineInput.deviceList[i],
+                                                     commandlineInput.algorithm,
+                                                     commandlineInput.step_size));
 
     }
-    printf("\nAll GPUs Initialized...\n\n\n");
+    printf("\nAll GPUs Initialized...\n");
+    printf("\n");
+    printf("\n");
 
     // start miner threads
 #ifndef _WIN32

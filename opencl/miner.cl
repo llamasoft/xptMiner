@@ -17,14 +17,14 @@ kernel void metiscoin_process(constant ulong* u,
                               global   uint*  outcount,
                                        uint   begin_nonce,
                                        uint   target,
-                              global   uint*  AES0,
-                              global   uint*  AES1,
-                              global   uint*  AES2,
-                              global   uint*  AES3,
-                              global   uint*  mixtab0,
-                              global   uint*  mixtab1,
-                              global   uint*  mixtab2,
-                              global   uint*  mixtab3)
+                              global   uint*  restrict AES0,
+                              global   uint*  restrict AES1,
+                              global   uint*  restrict AES2,
+                              global   uint*  restrict AES3,
+                              global   uint*  restrict mixtab0,
+                              global   uint*  restrict mixtab1,
+                              global   uint*  restrict mixtab2,
+                              global   uint*  restrict mixtab3)
 {
     uint nonce = begin_nonce + get_global_id(0);
 
@@ -91,7 +91,7 @@ kernel void metiscoin_process(constant ulong* u,
 }
 
 
-kernel void keccak_step_noinit(constant const ulong* u, constant const char* buff, global ulong* out, uint begin_nonce) {
+kernel void keccak_step_noinit(constant const ulong* u, constant const char* buff, global ulong* restrict out, uint begin_nonce) {
 
     size_t id = get_global_id(0);
     uint nonce = (uint)id + begin_nonce;
@@ -126,10 +126,10 @@ kernel void keccak_step_noinit(constant const ulong* u, constant const char* buf
 
 
 kernel void shavite_step(global ulong* in_out,
-                         global uint*  AES0,
-                         global uint*  AES1,
-                         global uint*  AES2,
-                         global uint*  AES3)
+                         global uint*  restrict AES0,
+                         global uint*  restrict AES1,
+                         global uint*  restrict AES2,
+                         global uint*  restrict AES3)
 {
     size_t id = get_global_id(0);
 
@@ -173,10 +173,10 @@ kernel void metis_step(global ulong* in,
                        global uint*  outcount,
                               uint   begin_nonce,
                               uint   target,
-                       global uint*  mixtab0,
-                       global uint*  mixtab1,
-                       global uint*  mixtab2,
-                       global uint*  mixtab3)
+                       global uint*  restrict mixtab0,
+                       global uint*  restrict mixtab1,
+                       global uint*  restrict mixtab2,
+                       global uint*  restrict mixtab3)
 {
     size_t id = get_global_id(0);
     uint nonce = (uint)id + begin_nonce;

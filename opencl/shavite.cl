@@ -22,8 +22,22 @@ __constant const uint IV512shavite[] __attribute__ ((aligned)) = {
 void
 shavite_init(shavite_context *sc)
 {
-    #pragma unroll
-    for (int i = 0; i < 16; i++) sc->h[i] = IV512shavite[i];
+    sc->h[0x0] = 0x72FCCDD8;
+    sc->h[0x1] = 0x79CA4727;
+    sc->h[0x2] = 0x128A077B;
+    sc->h[0x3] = 0x40D55AEC;
+    sc->h[0x4] = 0xD1901A06;
+    sc->h[0x5] = 0x430AE307;
+    sc->h[0x6] = 0xB29F5CD1;
+    sc->h[0x7] = 0xDF07FBFC;
+    sc->h[0x8] = 0x8E45D73D;
+    sc->h[0x9] = 0x681AB538;
+    sc->h[0xA] = 0xBDE86578;
+    sc->h[0xB] = 0xDD577E47;
+    sc->h[0xC] = 0xE275EADE;
+    sc->h[0xD] = 0x502D9FCD;
+    sc->h[0xE] = 0xB9357178;
+    sc->h[0xF] = 0x022A4B9A;
 }
 
 #define SPH_T32(x)  ((x) & SPH_C32(0xFFFFFFFF))
@@ -88,10 +102,10 @@ shavite_core_64(shavite_context *sc, const void *data)
 
 void
 shavite_close(shavite_context *sc, void *dst,
-              local uint* SHAVITE_LOOKUP0,
-              local uint* SHAVITE_LOOKUP1,
-              local uint* SHAVITE_LOOKUP2,
-              local uint* SHAVITE_LOOKUP3
+              local uint* restrict SHAVITE_LOOKUP0,
+              local uint* restrict SHAVITE_LOOKUP1,
+              local uint* restrict SHAVITE_LOOKUP2,
+              local uint* restrict SHAVITE_LOOKUP3
               )
 {
     unsigned char *buf;

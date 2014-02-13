@@ -6,12 +6,13 @@
 class MetiscoinOpenCL {
 public:
 
-	MetiscoinOpenCL(int device_num, uint32 algorithm);
+	MetiscoinOpenCL(int device_num, uint32 algo, uint32 step_size);
 	void metiscoin_process(minerMetiscoinBlock_t* block);
 private:
 
 	int device_num;
     uint32 algorithm;
+    uint32 step_size;
 
 	OpenCLKernel* kernel_all;
 	OpenCLKernel* kernel_keccak_noinit;
@@ -35,6 +36,8 @@ private:
     OpenCLBuffer* shavite_AES1;
     OpenCLBuffer* shavite_AES2;
     OpenCLBuffer* shavite_AES3;
+
+    OpenCLBuffer* sbox;
 
     OpenCLCommandQueue * q;
 	uint32_t out_tmp[255];
