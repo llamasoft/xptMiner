@@ -4,22 +4,11 @@
 #   include "OpenCLKernel.hpp"
 #endif
 
-__constant uint IV512metis[] __attribute__ ((aligned)) = {
-    (0x8807a57e), (0xe616af75), (0xc5d3e4db), (0xac9ab027),
-    (0xd915f117), (0xb6eecc54), (0x06e8020b), (0x4a92efd1),
-    (0xaac6e2c9), (0xddb21398), (0xcae65838), (0x437f203f),
-    (0x25ea78e7), (0x951fddd6), (0xda6ed11d), (0xe13e3567)
-};
 
 typedef struct {
     uint S[36];
-    ulong bit_count;
-    uint partial;
-    uint partial_len;
-    uint round_shift;
 } __attribute__ ((aligned)) metis_context;
 
-//#define METIS_NOCOPY
 #ifdef METIS_NOCOPY
 
 #define  S0 S[ 0]
@@ -145,11 +134,6 @@ void metis_init(metis_context* sc) {
     sc->S[33] = 0x951FDDD6;
     sc->S[34] = 0xDA6ED11D;
     sc->S[35] = 0xE13E3567;
-    
-    sc->partial = 0;
-    sc->partial_len = 0;
-    sc->round_shift = 0;
-    sc->bit_count = 0;
 }
 
 // Seriously, who the hell comes up with this?
@@ -264,14 +248,13 @@ enc32be(void *dst, uint val)
 
 
 
-void metis_core_and_close(metis_context *sc, const void *vdata, void *dst,
+void metis_core_and_close(metis_context *sc, const unsigned char *cdata, void *dst,
                           local uint* restrict METIS_LOOKUP0,
                           local uint* restrict METIS_LOOKUP1,
                           local uint* restrict METIS_LOOKUP2,
                           local uint* restrict METIS_LOOKUP3
                           )
 {
-    const unsigned char * cdata = (const unsigned char *)vdata;
     uint* S = sc->S;
     DECLSTATE;
     READSTATE;
@@ -458,7 +441,6 @@ void metis_core_and_close(metis_context *sc, const void *vdata, void *dst,
 
     // METIS CLOSE
     int i;
-    unsigned char *out;
 
     #pragma unroll
     for (i = 0; i < 2; i++) {
@@ -645,23 +627,22 @@ void metis_core_and_close(metis_context *sc, const void *vdata, void *dst,
 
     // Copy to output
     S29 ^= S25; S34 ^= S25;  S7 ^= S25; S16 ^= S25;
-    out = (unsigned char *)dst;
-    enc32be(out +  0, S26);
-    enc32be(out +  4, S27);
-    enc32be(out +  8, S28);
-    enc32be(out + 12, S29);
-    enc32be(out + 16, S34);
-    enc32be(out + 20, S35);
-    enc32be(out + 24,  S0);
-    enc32be(out + 28,  S1);
-    enc32be(out + 32,  S7);
-    enc32be(out + 36,  S8);
-    enc32be(out + 40,  S9);
-    enc32be(out + 44, S10);
-    enc32be(out + 48, S16);
-    enc32be(out + 52, S17);
-    enc32be(out + 56, S18);
-    enc32be(out + 60, S19);
+    enc32be(((unsigned char *)dst) +  0, S26);
+    enc32be(((unsigned char *)dst) +  4, S27);
+    enc32be(((unsigned char *)dst) +  8, S28);
+    enc32be(((unsigned char *)dst) + 12, S29);
+    enc32be(((unsigned char *)dst) + 16, S34);
+    enc32be(((unsigned char *)dst) + 20, S35);
+    enc32be(((unsigned char *)dst) + 24,  S0);
+    enc32be(((unsigned char *)dst) + 28,  S1);
+    enc32be(((unsigned char *)dst) + 32,  S7);
+    enc32be(((unsigned char *)dst) + 36,  S8);
+    enc32be(((unsigned char *)dst) + 40,  S9);
+    enc32be(((unsigned char *)dst) + 44, S10);
+    enc32be(((unsigned char *)dst) + 48, S16);
+    enc32be(((unsigned char *)dst) + 52, S17);
+    enc32be(((unsigned char *)dst) + 56, S18);
+    enc32be(((unsigned char *)dst) + 60, S19);
 }
 
 

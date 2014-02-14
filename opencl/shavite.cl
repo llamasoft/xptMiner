@@ -12,12 +12,6 @@ typedef struct {
 #define C32(x)  ((uint)(x))
 #define AESx(x) C32(x)
 
-__constant const uint IV512shavite[] __attribute__ ((aligned)) = {
-    C32(0x72FCCDD8), C32(0x79CA4727), C32(0x128A077B), C32(0x40D55AEC),
-    C32(0xD1901A06), C32(0x430AE307), C32(0xB29F5CD1), C32(0xDF07FBFC),
-    C32(0x8E45D73D), C32(0x681AB538), C32(0xBDE86578), C32(0xDD577E47),
-    C32(0xE275EADE), C32(0x502D9FCD), C32(0xB9357178), C32(0x022A4B9A)
-};
 
 void
 shavite_init(shavite_context *sc)

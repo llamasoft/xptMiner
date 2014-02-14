@@ -100,7 +100,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		    q->enqueueWriteBuffer(u, ctx_keccak.u.wide, 25*sizeof(cl_ulong));
 		    q->enqueueWriteBuffer(buff, ctx_keccak.buf, 4);
 
-		    q->enqueueKernel1D(kernel_keccak_noinit, step_size, kernel_keccak_noinit->getWorkGroupSize(device));
+		    q->enqueueKernel1D(kernel_keccak_noinit, step_size, kernel_keccak_noinit->getPreferredWorkGroupSize(device));
 
 #ifdef MEASURE_TIME
 		q->finish();
@@ -115,7 +115,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
             kernel_shavite->addGlobalArg(shavite_AES2);
             kernel_shavite->addGlobalArg(shavite_AES3);
 
-		    q->enqueueKernel1D(kernel_shavite, step_size, kernel_shavite->getWorkGroupSize(device));
+		    q->enqueueKernel1D(kernel_shavite, step_size, kernel_shavite->getPreferredWorkGroupSize(device));
 
 #ifdef MEASURE_TIME
 		q->finish();
@@ -136,7 +136,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 
 		    q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 
-		    q->enqueueKernel1D(kernel_metis, step_size, kernel_metis->getWorkGroupSize(device));
+		    q->enqueueKernel1D(kernel_metis, step_size, kernel_metis->getPreferredWorkGroupSize(device));
 
         // Algorithm 2
         // Do all hashing in one pass
@@ -164,7 +164,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
             q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 
             // Run
-            q->enqueueKernel1D(kernel_all, step_size, kernel_all->getWorkGroupSize(device));
+            q->enqueueKernel1D(kernel_all, step_size, kernel_all->getPreferredWorkGroupSize(device));
         }
 
 		q->enqueueReadBuffer(out, out_tmp, sizeof(cl_uint) * 255);

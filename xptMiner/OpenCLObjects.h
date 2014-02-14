@@ -74,6 +74,7 @@ public:
 
 	// info
 	size_t getWorkGroupSize(OpenCLDevice * device);
+	size_t OpenCLKernel::getPreferredWorkGroupSize(OpenCLDevice* device);
 private:
 	cl_kernel kernel;
 	// must know its parent;

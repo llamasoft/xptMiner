@@ -57,12 +57,10 @@ kernel void metiscoin_process(constant ulong* u,
 
 
     // keccak (resume from passed state)
-    ctx_keccak.lim = 72;
-    ctx_keccak.ptr = 8;
     #pragma unroll
     for (ushort i = 0; i < 4; i++) { ctx_keccak.buf[i] = buff[i]; }
     #pragma unroll
-    for (int i = 0; i < 25; i++) { ctx_keccak.u.wide[i] = u[i]; }
+    for (int i = 0; i < 25; i++) { ctx_keccak.wide[i] = u[i]; }
     *((uint*)(ctx_keccak.buf+4)) = nonce;
     keccak_close(&ctx_keccak, hash_temp);
 
@@ -85,8 +83,7 @@ kernel void metiscoin_process(constant ulong* u,
 
     if( *(uint*)((uchar*)hash_temp+28) <= target )
     {
-        uint pos = atomic_inc(outcount); //saves first pos for counter
-        out[pos] = nonce;
+        out[atomic_inc(outcount)] = nonce;
     }
 }
 
@@ -103,8 +100,6 @@ kernel void keccak_step_noinit(constant const ulong* u, constant const char* buf
 
     // inits context
     keccak_context	 ctx_keccak;
-    ctx_keccak.lim = 72;
-    ctx_keccak.ptr = 8;
 #pragma unroll
     for (int i = 0; i < 4; i++) {
         ctx_keccak.buf[i] = buff[i];
@@ -112,7 +107,7 @@ kernel void keccak_step_noinit(constant const ulong* u, constant const char* buf
     *((uint*)(ctx_keccak.buf+4)) = nonce;
 #pragma unroll
     for (int i = 0; i < 25; i++) {
-        ctx_keccak.u.wide[i] = u[i];
+        ctx_keccak.wide[i] = u[i];
     }
 
     // keccak
@@ -134,12 +129,11 @@ kernel void shavite_step(global ulong* in_out,
     size_t id = get_global_id(0);
 
     shavite_context	 ctx_shavite;
-    ulong hash0[8];
-    ulong hash1[8];
+    ulong hash[8];
 
     // prepares data
     for (int i = 0; i < 8; i++) {
-        hash0[i] = in_out[(id * 8)+i];
+        hash[i] = in_out[(id * 8)+i];
     }
 
     // Copy global lookup table into local memory
@@ -156,15 +150,15 @@ kernel void shavite_step(global ulong* in_out,
     wait_group_events(4, e);
 
     shavite_init(&ctx_shavite);
-    shavite_core_64(&ctx_shavite, hash0);
-    shavite_close(&ctx_shavite, hash1,
+    shavite_core_64(&ctx_shavite, hash);
+    shavite_close(&ctx_shavite, hash,
                   SHAVITE_LOOKUP0,
                   SHAVITE_LOOKUP1,
                   SHAVITE_LOOKUP2,
                   SHAVITE_LOOKUP3);
 
     for (int i = 0; i < 8; i++) {
-        in_out[(id * 8)+i] = hash1[i];
+        in_out[(id * 8)+i] = hash[i];
     }
 }
 
@@ -185,12 +179,11 @@ kernel void metis_step(global ulong* in,
     nonce = hnonce * 0x10000 + lnonce;
 
     metis_context ctx_metis;
-    ulong hash0[8];
-    ulong hash1[8];
+    ulong hash[8];
 
     // prepares data
     for (int i = 0; i < 8; i++) {
-        hash0[i] = in[(id * 8)+i];
+        hash[i] = in[(id * 8)+i];
     }
 
     // Copy global lookup table into local memory
@@ -208,17 +201,16 @@ kernel void metis_step(global ulong* in,
 
 
     metis_init(&ctx_metis);
-    metis_core_and_close(&ctx_metis, hash0, hash1,
+    metis_core_and_close(&ctx_metis, hash, hash,
                          METIS_LOOKUP0,
                          METIS_LOOKUP1,
                          METIS_LOOKUP2,
                          METIS_LOOKUP3);
 
 
-    if( *(uint*)((uchar*)hash1+28) <= target )
+    if( *(uint*)((uchar*)hash+28) <= target )
     {
-        uint pos = atomic_inc(outcount); //saves first pos for counter
-        out[pos] = nonce;
+        out[atomic_inc(outcount)] = nonce;
     }
 
 }

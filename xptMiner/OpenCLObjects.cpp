@@ -516,6 +516,13 @@ size_t OpenCLKernel::getWorkGroupSize(OpenCLDevice* device) {
 	return ret;
 }
 
+size_t OpenCLKernel::getPreferredWorkGroupSize(OpenCLDevice* device) {
+	size_t ret = 0;
+	check_error(clGetKernelWorkGroupInfo(this->kernel, device->getDeviceId(),
+				CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE, sizeof(ret), &ret, NULL));
+	return ret;
+}
+
 int OpenCLMain::getNumPlatforms() {
 	return platforms.size();
 }
