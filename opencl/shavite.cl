@@ -107,7 +107,7 @@ shavite_close(shavite_context *sc, void *dst,
     buf[64] = 0x80;
     //enc32le(buf + 110, 512); -> buff[110-113] = (0, 2, 0, 0);
     buf[111] = 2;
-    buf[126] = 512;
+    buf[126] = 0;
     buf[127] = 2;
 
 

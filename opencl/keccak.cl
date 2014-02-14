@@ -406,9 +406,6 @@ void keccak_core_end_64_8(keccak_context *kc, const void *data)
     // KHI
     DECL64(c0); DECL64(c1); DECL64(c2); DECL64(c3); DECL64(c4); DECL64(bnn);
 
-    // P1_TO_P0
-    DECL64(t);
-
     /*
     #pragma unroll
     for (int j = 0; j < 24; j ++) {
