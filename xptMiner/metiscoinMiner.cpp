@@ -30,7 +30,7 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo, uint32 _step_size
 	file_list.push_back("opencl/shavite.cl");
 	file_list.push_back("opencl/metis.cl");
 	file_list.push_back("opencl/miner.cl");
-	OpenCLProgram* program = device->getContext()->loadProgramFromFiles(file_list, "");
+	OpenCLProgram* program = device->getContext()->loadProgramFromFiles(file_list, "-I ./opencl/");
 
 	kernel_all = program->getKernel("metiscoin_process");
 	kernel_keccak_noinit = program->getKernel("keccak_step_noinit");

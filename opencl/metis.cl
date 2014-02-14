@@ -1,9 +1,4 @@
-
-#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
-#ifdef _ECLIPSE_OPENCL_HEADER
-#   include "OpenCLKernel.hpp"
-#endif
-
+#include "common.cl"
 
 typedef struct {
     uint S[36];
@@ -217,37 +212,6 @@ void metis_init(metis_context* sc) {
         | ((c1 ^ (r2 >>  8)) & (0x0000FF00))  \
         | ((c2 ^ (r3 >>  8)) & (0x000000FF)); \
 }
-
-
-#define my_dec32be(src) (((uint)(((const unsigned char *)src)[0]) << 24) \
-                        | ((uint)(((const unsigned char *)src)[1]) << 16) \
-                        | ((uint)(((const unsigned char *)src)[2]) << 8) \
-                        | (uint)(((const unsigned char *)src)[3]))
-
-
-void
-enc64be(void *dst, ulong val)
-{
-    ((unsigned char *)dst)[0] = (val >> 56);
-    ((unsigned char *)dst)[1] = (val >> 48);
-    ((unsigned char *)dst)[2] = (val >> 40);
-    ((unsigned char *)dst)[3] = (val >> 32);
-    ((unsigned char *)dst)[4] = (val >> 24);
-    ((unsigned char *)dst)[5] = (val >> 16);
-    ((unsigned char *)dst)[6] = (val >> 8);
-    ((unsigned char *)dst)[7] = val;
-}
-
-
-void
-enc32be(void *dst, uint val)
-{
-    ((unsigned char *)dst)[0] = (val >> 24);
-    ((unsigned char *)dst)[1] = (val >> 16);
-    ((unsigned char *)dst)[2] = (val >> 8);
-    ((unsigned char *)dst)[3] = val;
-}
-
 
 
 void metis_core_and_close(metis_context *sc, const unsigned char *cdata, void *dst,

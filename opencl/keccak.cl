@@ -1,10 +1,4 @@
-
-#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
-#ifdef _ECLIPSE_OPENCL_HEADER
-#   include "OpenCLKernel.hpp"
-#endif
-
-#define SPH_C64(x)    ((ulong)(x))
+#include "common.cl"
 
 typedef struct {
     unsigned char buf[144];    /* first field, for alignment */
@@ -130,26 +124,7 @@ typedef struct {
 #endif
 
 
-ulong
-dec64le_aligned(const void *src)
-{
-    return (ulong)(((const unsigned char *)src)[0])
-        | ((ulong)(((const unsigned char *)src)[1]) << 8)
-        | ((ulong)(((const unsigned char *)src)[2]) << 16)
-        | ((ulong)(((const unsigned char *)src)[3]) << 24)
-        | ((ulong)(((const unsigned char *)src)[4]) << 32)
-        | ((ulong)(((const unsigned char *)src)[5]) << 40)
-        | ((ulong)(((const unsigned char *)src)[6]) << 48)
-        | ((ulong)(((const unsigned char *)src)[7]) << 56);
-}
 
-
-#define enc64le_aligned(dst, val) (*((ulong*)(dst)) = (val))
-
-#define SPH_T64(x)          ((x) & SPH_C64(0xFFFFFFFFFFFFFFFF))
-//#define SPH_ROTL64(x, n)   SPH_T64(((x) << (n)) | ((x) >> (64 - (n))))
-#define SPH_ROTL64(x, n)    rotate((ulong)(x), (ulong)(n))
-#define SPH_ROTR64(x, n)    SPH_ROTL64(x, (64 - (n)))
 #define DECL64(x)           ulong x
 #define MOV64(d, s)         (d = s)
 #define XOR64(d, a, b)      (d = a ^ b)

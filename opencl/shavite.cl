@@ -1,17 +1,9 @@
-
-#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
-#ifdef _ECLIPSE_OPENCL_HEADER
-#   include "OpenCLKernel.hpp"
-#endif
+#include "common.cl"
 
 typedef struct {
     unsigned char buf[128];    /* first field, for alignment */
     uint h[16];
 } __attribute__ ((aligned)) shavite_context;
-
-#define C32(x)  ((uint)(x))
-#define AESx(x) C32(x)
-
 
 void
 shavite_init(shavite_context *sc)
@@ -34,9 +26,7 @@ shavite_init(shavite_context *sc)
     sc->h[0xF] = 0x022A4B9A;
 }
 
-#define SPH_T32(x)  ((x) & SPH_C32(0xFFFFFFFF))
-#define SPH_C32(x)  ((uint)(x))
-#define AESx(x)     SPH_C32(x)
+
 #define SHAVITE_LOOKUP0     local_AES0
 #define SHAVITE_LOOKUP1     local_AES1
 #define SHAVITE_LOOKUP2     local_AES2
@@ -78,14 +68,6 @@ shavite_init(shavite_context *sc)
         k = k.s1230; \
     }
 
-
-//#define sph_dec32le_aligned(src) ((uint)(((const unsigned char *)(src))[0]) \
-//		| ((uint)(((const unsigned char *)(src))[1]) << 8) \
-//		| ((uint)(((const unsigned char *)(src))[2]) << 16) \
-//		| ((uint)(((const unsigned char *)(src))[3]) << 24))
-
-#define sph_dec32le_aligned(x)  (*((uint*)(x)))
-#define enc32le(dst, val)       (*((uint*)(dst)) = (val))
 
 void
 shavite_core_64(shavite_context *sc, const void *data)
