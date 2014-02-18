@@ -1,6 +1,7 @@
 #include "global.h"
 #include "ticker.h"
 #include "metiscoinMiner.h"
+#include <sstream>
 
 // For copying lookup tables to OpenCL
 #include "sph_metis.h"
@@ -18,6 +19,7 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo, uint32 _step_size
 	printf("Initializing GPU %d\n", device_num);
 	OpenCLMain &main = OpenCLMain::getInstance();
 	OpenCLDevice* device = main.getDevice(device_num);
+	this->max_wgs = device->getMaxWorkGroupSize();
 
     printf("======================================================================\n");
 	printf("Device information for: %s\n", device->getName().c_str());
@@ -30,7 +32,11 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo, uint32 _step_size
 	file_list.push_back("opencl/shavite.cl");
 	file_list.push_back("opencl/metis.cl");
 	file_list.push_back("opencl/miner.cl");
-	OpenCLProgram* program = device->getContext()->loadProgramFromFiles(file_list, "-I ./opencl/");
+
+	std::stringstream params;
+	params << " -I ./opencl/";
+	params << " -D MAX_WGS=" << max_wgs;
+	OpenCLProgram* program = device->getContext()->loadProgramFromFiles(file_list, params.str());
 
 	kernel_all = program->getKernel("metiscoin_process");
 	kernel_keccak_noinit = program->getKernel("keccak_step_noinit");
@@ -48,7 +54,7 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo, uint32 _step_size
     metis_mixtab0 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)mixtab0);
     metis_mixtab1 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)mixtab1);
     metis_mixtab2 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)mixtab2);
-    metis_mixtab3 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)mixtab3);
+	metis_mixtab3 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)mixtab3);
 
     shavite_AES0 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)AES0);
     shavite_AES1 = device->getContext()->createBuffer(sizeof(cl_uint)*256, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (void*)AES1);
@@ -100,7 +106,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		    q->enqueueWriteBuffer(u, ctx_keccak.u.wide, 25*sizeof(cl_ulong));
 		    q->enqueueWriteBuffer(buff, ctx_keccak.buf, 4);
 
-		    q->enqueueKernel1D(kernel_keccak_noinit, step_size, kernel_keccak_noinit->getPreferredWorkGroupSize(device));
+		    q->enqueueKernel1D(kernel_keccak_noinit, step_size, max_wgs);
 
 #ifdef MEASURE_TIME
 		q->finish();
@@ -115,7 +121,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
             kernel_shavite->addGlobalArg(shavite_AES2);
             kernel_shavite->addGlobalArg(shavite_AES3);
 
-		    q->enqueueKernel1D(kernel_shavite, step_size, kernel_shavite->getPreferredWorkGroupSize(device));
+		    q->enqueueKernel1D(kernel_shavite, step_size, max_wgs);
 
 #ifdef MEASURE_TIME
 		q->finish();
@@ -136,7 +142,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 
 		    q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 
-		    q->enqueueKernel1D(kernel_metis, step_size, kernel_metis->getPreferredWorkGroupSize(device));
+		    q->enqueueKernel1D(kernel_metis, step_size, max_wgs);
 
         // Algorithm 2
         // Do all hashing in one pass
@@ -164,7 +170,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
             q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 
             // Run
-            q->enqueueKernel1D(kernel_all, step_size, kernel_all->getPreferredWorkGroupSize(device));
+            q->enqueueKernel1D(kernel_all, step_size, max_wgs);
         }
 
 		q->enqueueReadBuffer(out, out_tmp, sizeof(cl_uint) * 255);

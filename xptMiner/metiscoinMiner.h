@@ -13,6 +13,7 @@ private:
 	int device_num;
     uint32 algorithm;
     uint32 step_size;
+	uint32 max_wgs;
 
 	OpenCLKernel* kernel_all;
 	OpenCLKernel* kernel_keccak_noinit;
