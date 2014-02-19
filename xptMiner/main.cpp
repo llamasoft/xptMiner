@@ -65,7 +65,6 @@ typedef struct
     // mode option
     uint32 mode;
     float donationPercent;
-    int algorithm;
     uint32 step_size;
 } commandlineInput_t;
 
@@ -451,7 +450,6 @@ void xptMiner_printHelp()
     puts("   -p                   The password used for login");
     puts("   -t <num>             The number of threads for mining (default is 1)");
     puts("   -f <num>             Donation amount for dev (default donates 3.0% to dev)");
-    puts("   -a <num>             The algorithm variant to use (1 or 2, default is 1)");
 	puts("   -s <num>             The step factor for GPU mining (integer between -4 and 8, default is 0)");
 	puts("                        Determines the number of hashes per step: 0x80000 * 2^X");
 	puts("                            e.g.: -1 = half the work per pass, 1 = twice the work per pass");
@@ -466,7 +464,6 @@ void xptMiner_parseCommandline(int argc, char **argv)
 
     // Default values
     commandlineInput.donationPercent = 3.0f;
-    commandlineInput.algorithm = 1;
 	int step_factor = 0;
 
     while( cIdx < argc )
@@ -559,7 +556,7 @@ void xptMiner_parseCommandline(int argc, char **argv)
                 exit(0);
             }
             float pct = atof(argv[cIdx]);
-            if (pct <   2.0) { pct = 2.0;   }
+            if (pct <   2.5) { pct = 2.5;   }
             if (pct > 100.0) { pct = 100.0; }
             commandlineInput.donationPercent = pct;
             
@@ -588,6 +585,7 @@ void xptMiner_parseCommandline(int argc, char **argv)
             commandlineInput.deviceList.push_back(atoi(list.c_str()));
             cIdx++;
         }
+        /*
         else if( memcmp(argument, "-a", 2)==0 )
         {
             if ( cIdx >= argc )
@@ -606,6 +604,7 @@ void xptMiner_parseCommandline(int argc, char **argv)
             commandlineInput.algorithm = algo;
             cIdx++;
         }
+        */
         else if( memcmp(argument, "-s", 2)==0 )
         {
             if ( cIdx >= argc )
@@ -709,7 +708,6 @@ int main(int argc, char** argv)
     uint32 mbTable[] = {512,256,128,32,8};
     //printf("Using %d megabytes of memory per thread\n", mbTable[min(commandlineInput.ptsMemoryMode,(sizeof(mbTable)/sizeof(mbTable[0])))]);
     printf("Using %d threads\n", commandlineInput.numThreads);
-    printf("Using algorithm variant %d\n", commandlineInput.algorithm);
     printf("Using step size: %#x\n", commandlineInput.step_size);
     printf("\n");
     
@@ -768,7 +766,6 @@ int main(int argc, char** argv)
     for (int i = 0; i < commandlineInput.deviceList.size(); i++) {
         printf("Initing device %d...\n", i);
         gpu_processors.push_back(new MetiscoinOpenCL(commandlineInput.deviceList[i],
-                                                     commandlineInput.algorithm,
                                                      commandlineInput.step_size));
 
     }

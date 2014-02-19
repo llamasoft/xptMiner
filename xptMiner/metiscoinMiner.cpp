@@ -11,8 +11,7 @@
 // #define MEASURE_TIME 1
 
 
-MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo, uint32 _step_size) {
-    this->algorithm  = algo;
+MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 _step_size) {
 	this->device_num = _device_num;
     this->step_size  = (_step_size < MAX_NONCE ? _step_size : MAX_NONCE);
 
@@ -38,7 +37,7 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 algo, uint32 _step_size
 	params << " -D MAX_WGS=" << max_wgs;
 	OpenCLProgram* program = device->getContext()->loadProgramFromFiles(file_list, params.str());
 
-	kernel_all = program->getKernel("metiscoin_process");
+	// kernel_all = program->getKernel("metiscoin_process");
 	kernel_keccak_noinit = program->getKernel("keccak_step_noinit");
 	kernel_shavite = program->getKernel("shavite_step");
 	kernel_metis = program->getKernel("metis_step");
@@ -91,59 +90,56 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 		sph_keccak512(&ctx_keccak, &block->version, 80);
 
 
-        // Algorithm variant 1: do hashing in 3 separate parts
-        // keccak, then shavite, then metis
-        if (this->algorithm == 1)
-        {
-		    //keccak
-		    //kernel void keccak_step_noinit(constant const ulong* u, constant const char* buff, global ulong* out, uint begin_nonce)
-		    kernel_keccak_noinit->resetArgs();
-		    kernel_keccak_noinit->addGlobalArg(u);
-		    kernel_keccak_noinit->addGlobalArg(buff);
-		    kernel_keccak_noinit->addGlobalArg(hashes);
-		    kernel_keccak_noinit->addScalarUInt(n * step_size);
+		//keccak
+		//kernel void keccak_step_noinit(constant const ulong* u, constant const char* buff, global ulong* out, uint begin_nonce)
+		kernel_keccak_noinit->resetArgs();
+		kernel_keccak_noinit->addGlobalArg(u);
+		kernel_keccak_noinit->addGlobalArg(buff);
+		kernel_keccak_noinit->addGlobalArg(hashes);
+		kernel_keccak_noinit->addScalarUInt(n * step_size);
 
-		    q->enqueueWriteBuffer(u, ctx_keccak.u.wide, 25*sizeof(cl_ulong));
-		    q->enqueueWriteBuffer(buff, ctx_keccak.buf, 4);
+		q->enqueueWriteBuffer(u, ctx_keccak.u.wide, 25*sizeof(cl_ulong));
+		q->enqueueWriteBuffer(buff, ctx_keccak.buf, 4);
 
-		    q->enqueueKernel1D(kernel_keccak_noinit, step_size, max_wgs);
+		q->enqueueKernel1D(kernel_keccak_noinit, step_size, max_wgs);
 
 #ifdef MEASURE_TIME
 		q->finish();
 		end_keccak = getTimeMilliseconds();
 #endif
 
-		    // shavite
-		    kernel_shavite->resetArgs();
-		    kernel_shavite->addGlobalArg(hashes);
-            kernel_shavite->addGlobalArg(shavite_AES0);
-            kernel_shavite->addGlobalArg(shavite_AES1);
-            kernel_shavite->addGlobalArg(shavite_AES2);
-            kernel_shavite->addGlobalArg(shavite_AES3);
+		// shavite
+		kernel_shavite->resetArgs();
+		kernel_shavite->addGlobalArg(hashes);
+        kernel_shavite->addGlobalArg(shavite_AES0);
+        kernel_shavite->addGlobalArg(shavite_AES1);
+        kernel_shavite->addGlobalArg(shavite_AES2);
+        kernel_shavite->addGlobalArg(shavite_AES3);
 
-		    q->enqueueKernel1D(kernel_shavite, step_size, max_wgs);
+		q->enqueueKernel1D(kernel_shavite, step_size, max_wgs);
 
 #ifdef MEASURE_TIME
 		q->finish();
 		end_shavite = getTimeMilliseconds();
 #endif
-		    // metis
-		    kernel_metis->resetArgs();
-		    kernel_metis->addGlobalArg(hashes);
-		    kernel_metis->addGlobalArg(out);
-		    kernel_metis->addGlobalArg(out_count);
-		    kernel_metis->addScalarUInt(n * step_size);
-		    kernel_metis->addScalarUInt(target);
+		// metis
+		kernel_metis->resetArgs();
+		kernel_metis->addGlobalArg(hashes);
+		kernel_metis->addGlobalArg(out);
+		kernel_metis->addGlobalArg(out_count);
+		kernel_metis->addScalarUInt(n * step_size);
+		kernel_metis->addScalarUInt(target);
 
-            kernel_metis->addGlobalArg(metis_mixtab0);
-            kernel_metis->addGlobalArg(metis_mixtab1);
-            kernel_metis->addGlobalArg(metis_mixtab2);
-            kernel_metis->addGlobalArg(metis_mixtab3);
+        kernel_metis->addGlobalArg(metis_mixtab0);
+        kernel_metis->addGlobalArg(metis_mixtab1);
+        kernel_metis->addGlobalArg(metis_mixtab2);
+        kernel_metis->addGlobalArg(metis_mixtab3);
 
-		    q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
+		q->enqueueWriteBuffer(out_count, &out_count_tmp, sizeof(cl_uint));
 
-		    q->enqueueKernel1D(kernel_metis, step_size, max_wgs);
+		q->enqueueKernel1D(kernel_metis, step_size, max_wgs);
 
+        /*
         // Algorithm 2
         // Do all hashing in one pass
         } else if (this->algorithm == 2) {
@@ -172,6 +168,7 @@ void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
             // Run
             q->enqueueKernel1D(kernel_all, step_size, max_wgs);
         }
+        */
 
 		q->enqueueReadBuffer(out, out_tmp, sizeof(cl_uint) * 255);
 		q->enqueueReadBuffer(out_count, &out_count_tmp, sizeof(cl_uint));

@@ -6,12 +6,11 @@
 class MetiscoinOpenCL {
 public:
 
-	MetiscoinOpenCL(int device_num, uint32 algo, uint32 step_size);
+	MetiscoinOpenCL(int device_num, uint32 step_size);
 	void metiscoin_process(minerMetiscoinBlock_t* block);
 private:
 
 	int device_num;
-    uint32 algorithm;
     uint32 step_size;
 	uint32 max_wgs;
 

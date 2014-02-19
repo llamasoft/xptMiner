@@ -1,16 +1,6 @@
 #include "common.cl"
 
 
-#define DECL64(x)           ulong x
-#define MOV64(d, s)         (d = s)
-#define XOR64(d, a, b)      (d = a ^ b)
-#define AND64(d, a, b)      (d = a & b)
-#define OR64(d, a, b)       (d = a | b)
-#define NOT64(d, s)         (d = SPH_T64(~s))
-#define ROL64(d, v, n)      (d = SPH_ROTL64(v, n))
-#define XOR64_IOTA          XOR64
-
-
 #define TH_ELT(t, c0, c1, c2, c3, c4, d0, d1, d2, d3, d4) \
 { \
     t = rotate((ulong)(d0 ^ d1 ^ d2 ^ d3 ^ d4), (ulong)1) \

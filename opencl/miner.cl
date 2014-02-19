@@ -18,6 +18,7 @@ metiscoin_process(constant ulong* wide,
                   global   uint*  restrict mixtab2,
                   global   uint*  restrict mixtab3)
 {
+    /*
     uint nonce = begin_nonce + get_global_id(0);
     ulong hash_temp[8];
 
@@ -66,6 +67,7 @@ metiscoin_process(constant ulong* wide,
     {
         out[atomic_inc(outcount)] = nonce;
     }
+    */
 }
 
 
@@ -100,15 +102,15 @@ shavite_step(global ulong* in_out,
     ulong hash[8];
 
     // Copy global lookup table into local memory
-    local uint SHAVITE_LOOKUP0[256];
-    local uint SHAVITE_LOOKUP1[256];
-    local uint SHAVITE_LOOKUP2[256];
-    local uint SHAVITE_LOOKUP3[256];
+    local uint shavite_lookup0[256];
+    local uint shavite_lookup1[256];
+    local uint shavite_lookup2[256];
+    local uint shavite_lookup3[256];
     event_t e;
-    e = async_work_group_copy(SHAVITE_LOOKUP0, AES0, 256, 0);
-    e = async_work_group_copy(SHAVITE_LOOKUP1, AES1, 256, e);
-    e = async_work_group_copy(SHAVITE_LOOKUP2, AES2, 256, e);
-    e = async_work_group_copy(SHAVITE_LOOKUP3, AES3, 256, e);
+    e = async_work_group_copy(shavite_lookup0, AES0, 256, 0);
+    e = async_work_group_copy(shavite_lookup1, AES1, 256, e);
+    e = async_work_group_copy(shavite_lookup2, AES2, 256, e);
+    e = async_work_group_copy(shavite_lookup3, AES3, 256, e);
     wait_group_events(1, &e);
     
     // prepares data
@@ -120,10 +122,10 @@ shavite_step(global ulong* in_out,
     //shavite_init(&ctx_shavite);
     //shavite_core_64(&ctx_shavite, hash);
     shavite((uint *)hash,
-            SHAVITE_LOOKUP0,
-            SHAVITE_LOOKUP1,
-            SHAVITE_LOOKUP2,
-            SHAVITE_LOOKUP3);
+            shavite_lookup0,
+            shavite_lookup1,
+            shavite_lookup2,
+            shavite_lookup3);
 
     #pragma unroll
     for (int i = 0; i < 8; i++) {

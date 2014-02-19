@@ -1,32 +1,26 @@
 #include "common.cl"
 
 
-#define SHAVITE_LOOKUP0     local_AES0
-#define SHAVITE_LOOKUP1     local_AES1
-#define SHAVITE_LOOKUP2     local_AES2
-#define SHAVITE_LOOKUP3     local_AES3
-
-
 #define AES_ROUND_LE(X, Y)   { \
-        Y.s0  = SHAVITE_LOOKUP0[UINT_BYTE3(X.s0)]; \
-        Y.s1  = SHAVITE_LOOKUP1[UINT_BYTE2(X.s2)]; \
-        Y.s2  = SHAVITE_LOOKUP2[UINT_BYTE1(X.s0)]; \
-        Y.s3  = SHAVITE_LOOKUP3[UINT_BYTE0(X.s2)]; \
+        Y.s0  = local_AES0[UINT_BYTE3(X.s0)]; \
+        Y.s1  = local_AES1[UINT_BYTE2(X.s2)]; \
+        Y.s2  = local_AES2[UINT_BYTE1(X.s0)]; \
+        Y.s3  = local_AES3[UINT_BYTE0(X.s2)]; \
         \
-        Y.s0 ^= SHAVITE_LOOKUP1[UINT_BYTE2(X.s1)]; \
-        Y.s1 ^= SHAVITE_LOOKUP2[UINT_BYTE1(X.s3)]; \
-        Y.s2 ^= SHAVITE_LOOKUP3[UINT_BYTE0(X.s1)]; \
-        Y.s3 ^= SHAVITE_LOOKUP0[UINT_BYTE3(X.s3)]; \
+        Y.s0 ^= local_AES1[UINT_BYTE2(X.s1)]; \
+        Y.s1 ^= local_AES2[UINT_BYTE1(X.s3)]; \
+        Y.s2 ^= local_AES3[UINT_BYTE0(X.s1)]; \
+        Y.s3 ^= local_AES0[UINT_BYTE3(X.s3)]; \
         \
-        Y.s0 ^= SHAVITE_LOOKUP2[UINT_BYTE1(X.s2)]; \
-        Y.s1 ^= SHAVITE_LOOKUP3[UINT_BYTE0(X.s0)]; \
-        Y.s2 ^= SHAVITE_LOOKUP0[UINT_BYTE3(X.s2)]; \
-        Y.s3 ^= SHAVITE_LOOKUP1[UINT_BYTE2(X.s0)]; \
+        Y.s0 ^= local_AES2[UINT_BYTE1(X.s2)]; \
+        Y.s1 ^= local_AES3[UINT_BYTE0(X.s0)]; \
+        Y.s2 ^= local_AES0[UINT_BYTE3(X.s2)]; \
+        Y.s3 ^= local_AES1[UINT_BYTE2(X.s0)]; \
         \
-        Y.s0 ^= SHAVITE_LOOKUP3[UINT_BYTE0(X.s3)]; \
-        Y.s1 ^= SHAVITE_LOOKUP0[UINT_BYTE3(X.s1)]; \
-        Y.s2 ^= SHAVITE_LOOKUP1[UINT_BYTE2(X.s3)]; \
-        Y.s3 ^= SHAVITE_LOOKUP2[UINT_BYTE1(X.s1)]; \
+        Y.s0 ^= local_AES3[UINT_BYTE0(X.s3)]; \
+        Y.s1 ^= local_AES0[UINT_BYTE3(X.s1)]; \
+        Y.s2 ^= local_AES1[UINT_BYTE2(X.s3)]; \
+        Y.s3 ^= local_AES2[UINT_BYTE1(X.s1)]; \
     }
 
 #define AES_ROUND_NOKEY(x)   { \
@@ -42,10 +36,10 @@
 
 void
 shavite(uint* restrict in_out,
-        local uint* restrict SHAVITE_LOOKUP0,
-        local uint* restrict SHAVITE_LOOKUP1,
-        local uint* restrict SHAVITE_LOOKUP2,
-        local uint* restrict SHAVITE_LOOKUP3
+        local uint* restrict local_AES0,
+        local uint* restrict local_AES1,
+        local uint* restrict local_AES2,
+        local uint* restrict local_AES3
         )
 {
     //uint p0, p1, p2, p3, p4, p5, p6, p7;
