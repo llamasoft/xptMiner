@@ -1,129 +1,5 @@
 #include "common.cl"
 
-typedef struct {
-    unsigned char buf[144];    /* first field, for alignment */
-    ulong wide[25];
-} __attribute__ ((aligned)) keccak_context;
-
-// #define SPH_KECCAK_NOCOPY
-#ifdef SPH_KECCAK_NOCOPY
-
-#define a00   (kc->wide[ 0])
-#define a10   (kc->wide[ 1])
-#define a20   (kc->wide[ 2])
-#define a30   (kc->wide[ 3])
-#define a40   (kc->wide[ 4])
-#define a01   (kc->wide[ 5])
-#define a11   (kc->wide[ 6])
-#define a21   (kc->wide[ 7])
-#define a31   (kc->wide[ 8])
-#define a41   (kc->wide[ 9])
-#define a02   (kc->wide[10])
-#define a12   (kc->wide[11])
-#define a22   (kc->wide[12])
-#define a32   (kc->wide[13])
-#define a42   (kc->wide[14])
-#define a03   (kc->wide[15])
-#define a13   (kc->wide[16])
-#define a23   (kc->wide[17])
-#define a33   (kc->wide[18])
-#define a43   (kc->wide[19])
-#define a04   (kc->wide[20])
-#define a14   (kc->wide[21])
-#define a24   (kc->wide[22])
-#define a34   (kc->wide[23])
-#define a44   (kc->wide[24])
-
-#define DECL_STATE
-#define READ_STATE(sc)
-#define WRITE_STATE(sc)
-
-#define INPUT_BUF72   do { \
-        #pragma unroll \
-        for (size_t j = 0; j < 72; j += 8) { \
-            kc->wide[j >> 3] ^= (*((ulong*)(buf + j))); \
-        } \
-    } while (0)
-
-#else
-
-#define DECL_STATE \
-    ulong a00, a01, a02, a03, a04; \
-    ulong a10, a11, a12, a13, a14; \
-    ulong a20, a21, a22, a23, a24; \
-    ulong a30, a31, a32, a33, a34; \
-    ulong a40, a41, a42, a43, a44;
-
-#define READ_STATE(state)   do { \
-        a00 = (state)->wide[ 0]; \
-        a10 = (state)->wide[ 1]; \
-        a20 = (state)->wide[ 2]; \
-        a30 = (state)->wide[ 3]; \
-        a40 = (state)->wide[ 4]; \
-        a01 = (state)->wide[ 5]; \
-        a11 = (state)->wide[ 6]; \
-        a21 = (state)->wide[ 7]; \
-        a31 = (state)->wide[ 8]; \
-        a41 = (state)->wide[ 9]; \
-        a02 = (state)->wide[10]; \
-        a12 = (state)->wide[11]; \
-        a22 = (state)->wide[12]; \
-        a32 = (state)->wide[13]; \
-        a42 = (state)->wide[14]; \
-        a03 = (state)->wide[15]; \
-        a13 = (state)->wide[16]; \
-        a23 = (state)->wide[17]; \
-        a33 = (state)->wide[18]; \
-        a43 = (state)->wide[19]; \
-        a04 = (state)->wide[20]; \
-        a14 = (state)->wide[21]; \
-        a24 = (state)->wide[22]; \
-        a34 = (state)->wide[23]; \
-        a44 = (state)->wide[24]; \
-    } while (0)
-
-#define WRITE_STATE(state)   do { \
-        (state)->wide[ 0] = a00; \
-        (state)->wide[ 1] = a10; \
-        (state)->wide[ 2] = a20; \
-        (state)->wide[ 3] = a30; \
-        (state)->wide[ 4] = a40; \
-        (state)->wide[ 5] = a01; \
-        (state)->wide[ 6] = a11; \
-        (state)->wide[ 7] = a21; \
-        (state)->wide[ 8] = a31; \
-        (state)->wide[ 9] = a41; \
-        (state)->wide[10] = a02; \
-        (state)->wide[11] = a12; \
-        (state)->wide[12] = a22; \
-        (state)->wide[13] = a32; \
-        (state)->wide[14] = a42; \
-        (state)->wide[15] = a03; \
-        (state)->wide[16] = a13; \
-        (state)->wide[17] = a23; \
-        (state)->wide[18] = a33; \
-        (state)->wide[19] = a43; \
-        (state)->wide[20] = a04; \
-        (state)->wide[21] = a14; \
-        (state)->wide[22] = a24; \
-        (state)->wide[23] = a34; \
-        (state)->wide[24] = a44; \
-    } while (0)
-
-#define INPUT_BUF72   do { \
-        a00 ^= (*((ulong*)(buf +   0))); \
-        a10 ^= (*((ulong*)(buf +   8))); \
-        a20 ^= (*((ulong*)(buf +  16))); \
-        a30 ^= (*((ulong*)(buf +  24))); \
-        a40 ^= (*((ulong*)(buf +  32))); \
-        a01 ^= (*((ulong*)(buf +  40))); \
-        a11 ^= (*((ulong*)(buf +  48))); \
-        a21 ^= (*((ulong*)(buf +  56))); \
-        a31 ^= (*((ulong*)(buf +  64))); \
-    } while (0)
-#endif
-
-
 
 #define DECL64(x)           ulong x
 #define MOV64(d, s)         (d = s)
@@ -135,84 +11,61 @@ typedef struct {
 #define XOR64_IOTA          XOR64
 
 
-#define TH_ELT(t, c0, c1, c2, c3, c4, d0, d1, d2, d3, d4)   { \
-        XOR64(tt0, d0, d1); \
-        XOR64(tt1, d2, d3); \
-        XOR64(tt0, tt0, d4); \
-        XOR64(tt0, tt0, tt1); \
-        ROL64(tt0, tt0, 1); \
-        XOR64(tt2, c0, c1); \
-        XOR64(tt3, c2, c3); \
-        XOR64(tt0, tt0, c4); \
-        XOR64(tt2, tt2, tt3); \
-        XOR64(t, tt0, tt2); \
-    }
+#define TH_ELT(t, c0, c1, c2, c3, c4, d0, d1, d2, d3, d4) \
+{ \
+    t = rotate((ulong)(d0 ^ d1 ^ d2 ^ d3 ^ d4), (ulong)1) \
+                    ^ (c0 ^ c1 ^ c2 ^ c3 ^ c4);           \
+}
 
-#define THETA(b00, b01, b02, b03, b04, b10, b11, b12, b13, b14, \
-    b20, b21, b22, b23, b24, b30, b31, b32, b33, b34, \
-    b40, b41, b42, b43, b44) \
-    { \
-        TH_ELT(t0, b40, b41, b42, b43, b44, b10, b11, b12, b13, b14); \
-        TH_ELT(t1, b00, b01, b02, b03, b04, b20, b21, b22, b23, b24); \
-        TH_ELT(t2, b10, b11, b12, b13, b14, b30, b31, b32, b33, b34); \
-        TH_ELT(t3, b20, b21, b22, b23, b24, b40, b41, b42, b43, b44); \
-        TH_ELT(t4, b30, b31, b32, b33, b34, b00, b01, b02, b03, b04); \
-        XOR64(b00, b00, t0); \
-        XOR64(b01, b01, t0); \
-        XOR64(b02, b02, t0); \
-        XOR64(b03, b03, t0); \
-        XOR64(b04, b04, t0); \
-        XOR64(b10, b10, t1); \
-        XOR64(b11, b11, t1); \
-        XOR64(b12, b12, t1); \
-        XOR64(b13, b13, t1); \
-        XOR64(b14, b14, t1); \
-        XOR64(b20, b20, t2); \
-        XOR64(b21, b21, t2); \
-        XOR64(b22, b22, t2); \
-        XOR64(b23, b23, t2); \
-        XOR64(b24, b24, t2); \
-        XOR64(b30, b30, t3); \
-        XOR64(b31, b31, t3); \
-        XOR64(b32, b32, t3); \
-        XOR64(b33, b33, t3); \
-        XOR64(b34, b34, t3); \
-        XOR64(b40, b40, t4); \
-        XOR64(b41, b41, t4); \
-        XOR64(b42, b42, t4); \
-        XOR64(b43, b43, t4); \
-        XOR64(b44, b44, t4); \
-    }
+#define THETA(b00, b01, b02, b03, b04, \
+              b10, b11, b12, b13, b14, \
+              b20, b21, b22, b23, b24, \
+              b30, b31, b32, b33, b34, \
+              b40, b41, b42, b43, b44) \
+{ \
+    TH_ELT(t0, b40, b41, b42, b43, b44, b10, b11, b12, b13, b14); \
+    TH_ELT(t1, b00, b01, b02, b03, b04, b20, b21, b22, b23, b24); \
+    TH_ELT(t2, b10, b11, b12, b13, b14, b30, b31, b32, b33, b34); \
+    TH_ELT(t3, b20, b21, b22, b23, b24, b40, b41, b42, b43, b44); \
+    TH_ELT(t4, b30, b31, b32, b33, b34, b00, b01, b02, b03, b04); \
+    b00 ^= t0; b01 ^= t0; b02 ^= t0; b03 ^= t0; b04 ^= t0; \
+    b10 ^= t1; b11 ^= t1; b12 ^= t1; b13 ^= t1; b14 ^= t1; \
+    b20 ^= t2; b21 ^= t2; b22 ^= t2; b23 ^= t2; b24 ^= t2; \
+    b30 ^= t3; b31 ^= t3; b32 ^= t3; b33 ^= t3; b34 ^= t3; \
+    b40 ^= t4; b41 ^= t4; b42 ^= t4; b43 ^= t4; b44 ^= t4; \
+}
 
-#define RHO(b00, b01, b02, b03, b04, b10, b11, b12, b13, b14, \
-    b20, b21, b22, b23, b24, b30, b31, b32, b33, b34, \
-    b40, b41, b42, b43, b44) \
-    { \
-        ROL64(b01, b01, 36); \
-        ROL64(b02, b02,  3); \
-        ROL64(b03, b03, 41); \
-        ROL64(b04, b04, 18); \
-        ROL64(b10, b10,  1); \
-        ROL64(b11, b11, 44); \
-        ROL64(b12, b12, 10); \
-        ROL64(b13, b13, 45); \
-        ROL64(b14, b14,  2); \
-        ROL64(b20, b20, 62); \
-        ROL64(b21, b21,  6); \
-        ROL64(b22, b22, 43); \
-        ROL64(b23, b23, 15); \
-        ROL64(b24, b24, 61); \
-        ROL64(b30, b30, 28); \
-        ROL64(b31, b31, 55); \
-        ROL64(b32, b32, 25); \
-        ROL64(b33, b33, 21); \
-        ROL64(b34, b34, 56); \
-        ROL64(b40, b40, 27); \
-        ROL64(b41, b41, 20); \
-        ROL64(b42, b42, 39); \
-        ROL64(b43, b43,  8); \
-        ROL64(b44, b44, 14); \
-    }
+#define RHO(b00, b01, b02, b03, b04, \
+            b10, b11, b12, b13, b14, \
+            b20, b21, b22, b23, b24, \
+            b30, b31, b32, b33, b34, \
+            b40, b41, b42, b43, b44) \
+{ \
+    b01 = rotate(b01, (ulong)36); \
+    b02 = rotate(b02, (ulong) 3); \
+    b03 = rotate(b03, (ulong)41); \
+    b04 = rotate(b04, (ulong)18); \
+    b10 = rotate(b10, (ulong) 1); \
+    b11 = rotate(b11, (ulong)44); \
+    b12 = rotate(b12, (ulong)10); \
+    b13 = rotate(b13, (ulong)45); \
+    b14 = rotate(b14, (ulong) 2); \
+    b20 = rotate(b20, (ulong)62); \
+    b21 = rotate(b21, (ulong) 6); \
+    b22 = rotate(b22, (ulong)43); \
+    b23 = rotate(b23, (ulong)15); \
+    b24 = rotate(b24, (ulong)61); \
+    b30 = rotate(b30, (ulong)28); \
+    b31 = rotate(b31, (ulong)55); \
+    b32 = rotate(b32, (ulong)25); \
+    b33 = rotate(b33, (ulong)21); \
+    b34 = rotate(b34, (ulong)56); \
+    b40 = rotate(b40, (ulong)27); \
+    b41 = rotate(b41, (ulong)20); \
+    b42 = rotate(b42, (ulong)39); \
+    b43 = rotate(b43, (ulong) 8); \
+    b44 = rotate(b44, (ulong)14); \
+}
 
 /*
  * The KHI macro integrates the "lane complement" optimization. On input,
@@ -225,161 +78,95 @@ typedef struct {
  * the input mask for the next round.
  */
 
-#define KHI_XO(d, a, b, c)   { \
-        OR64(kt, b, c); \
-        XOR64(d, a, kt); \
-    }
-
-#define KHI_XA(d, a, b, c)   { \
-        AND64(kt, b, c); \
-        XOR64(d, a, kt); \
-    }
-
 #define KHI(b00, b01, b02, b03, b04, \
             b10, b11, b12, b13, b14, \
             b20, b21, b22, b23, b24, \
             b30, b31, b32, b33, b34, \
             b40, b41, b42, b43, b44) \
-    { \
-        NOT64(bnn, b20); \
-        KHI_XO(c0, b00, b10, b20); \
-        KHI_XO(c1, b10, bnn, b30); \
-        KHI_XA(c2, b20, b30, b40); \
-        KHI_XO(c3, b30, b40, b00); \
-        KHI_XA(c4, b40, b00, b10); \
-        MOV64(b00, c0); \
-        MOV64(b10, c1); \
-        MOV64(b20, c2); \
-        MOV64(b30, c3); \
-        MOV64(b40, c4); \
-        NOT64(bnn, b41); \
-        KHI_XO(c0, b01, b11, b21); \
-        KHI_XA(c1, b11, b21, b31); \
-        KHI_XO(c2, b21, b31, bnn); \
-        KHI_XO(c3, b31, b41, b01); \
-        KHI_XA(c4, b41, b01, b11); \
-        MOV64(b01, c0); \
-        MOV64(b11, c1); \
-        MOV64(b21, c2); \
-        MOV64(b31, c3); \
-        MOV64(b41, c4); \
-        NOT64(bnn, b32); \
-        KHI_XO(c0, b02, b12, b22); \
-        KHI_XA(c1, b12, b22, b32); \
-        KHI_XA(c2, b22, bnn, b42); \
-        KHI_XO(c3, bnn, b42, b02); \
-        KHI_XA(c4, b42, b02, b12); \
-        MOV64(b02, c0); \
-        MOV64(b12, c1); \
-        MOV64(b22, c2); \
-        MOV64(b32, c3); \
-        MOV64(b42, c4); \
-        NOT64(bnn, b33); \
-        KHI_XA(c0, b03, b13, b23); \
-        KHI_XO(c1, b13, b23, b33); \
-        KHI_XO(c2, b23, bnn, b43); \
-        KHI_XA(c3, bnn, b43, b03); \
-        KHI_XO(c4, b43, b03, b13); \
-        MOV64(b03, c0); \
-        MOV64(b13, c1); \
-        MOV64(b23, c2); \
-        MOV64(b33, c3); \
-        MOV64(b43, c4); \
-        NOT64(bnn, b14); \
-        KHI_XA(c0, b04, bnn, b24); \
-        KHI_XO(c1, bnn, b24, b34); \
-        KHI_XA(c2, b24, b34, b44); \
-        KHI_XO(c3, b34, b44, b04); \
-        KHI_XA(c4, b44, b04, b14); \
-        MOV64(b04, c0); \
-        MOV64(b14, c1); \
-        MOV64(b24, c2); \
-        MOV64(b34, c3); \
-        MOV64(b44, c4); \
-    }
-
-#define IOTA(r)   XOR64_IOTA(a00, a00, r)
-
-#define P1_TO_P0   { \
-        MOV64(t, a01); \
-        MOV64(a01, a30); \
-        MOV64(a30, a33); \
-        MOV64(a33, a23); \
-        MOV64(a23, a12); \
-        MOV64(a12, a21); \
-        MOV64(a21, a02); \
-        MOV64(a02, a10); \
-        MOV64(a10, a11); \
-        MOV64(a11, a41); \
-        MOV64(a41, a24); \
-        MOV64(a24, a42); \
-        MOV64(a42, a04); \
-        MOV64(a04, a20); \
-        MOV64(a20, a22); \
-        MOV64(a22, a32); \
-        MOV64(a32, a43); \
-        MOV64(a43, a34); \
-        MOV64(a34, a03); \
-        MOV64(a03, a40); \
-        MOV64(a40, a44); \
-        MOV64(a44, a14); \
-        MOV64(a14, a31); \
-        MOV64(a31, a13); \
-        MOV64(a13, t); \
-    }
-
-#define KECCAK_F_1600_   { \
-        int j; \
-        for (j = 0; j < 24; j ++) { \
-            KF_ELT01(RC[j + 0]); \
-            P1_TO_P0; \
-        } \
-    }
-
-void
-keccak_init(keccak_context *kc)
-{
-    int i;
-
-    #pragma unroll
-    for (i = 0; i < 25; i ++) { kc->wide[i] = 0; }
-    /*
-     * Initialization for the "lane complement".
-     */
-    kc->wide[ 1] = SPH_C64(0xFFFFFFFFFFFFFFFFL);
-    kc->wide[ 2] = SPH_C64(0xFFFFFFFFFFFFFFFFL);
-    kc->wide[ 8] = SPH_C64(0xFFFFFFFFFFFFFFFFL);
-    kc->wide[12] = SPH_C64(0xFFFFFFFFFFFFFFFFL);
-    kc->wide[17] = SPH_C64(0xFFFFFFFFFFFFFFFFL);
-    kc->wide[20] = SPH_C64(0xFFFFFFFFFFFFFFFFL);
+{ \
+    t0 = b00 ^ ( b10 |  b20); \
+    t1 = b10 ^ (~b20 |  b30); \
+    t2 = b20 ^ ( b30 &  b40); \
+    t3 = b30 ^ ( b40 |  b00); \
+    t4 = b40 ^ ( b00 &  b10); \
+    b00 = t0; b10 = t1; b20 = t2; b30 = t3; b40 = t4; \
+    \
+    t0 = b01 ^ ( b11 |  b21); \
+    t1 = b11 ^ ( b21 &  b31); \
+    t2 = b21 ^ ( b31 | ~b41); \
+    t3 = b31 ^ ( b41 |  b01); \
+    t4 = b41 ^ ( b01 &  b11); \
+    b01 = t0; b11 = t1; b21 = t2; b31 = t3; b41 = t4; \
+    \
+    t0 = b02 ^ ( b12 |  b22); \
+    t1 = b12 ^ ( b22 &  b32); \
+    t2 = b22 ^ (~b32 &  b42); \
+    t3 =~b32 ^ ( b42 |  b02); \
+    t4 = b42 ^ ( b02 &  b12); \
+    b02 = t0; b12 = t1; b22 = t2; b32 = t3; b42 = t4; \
+    \
+    t0 = b03 ^ ( b13 &  b23); \
+    t1 = b13 ^ ( b23 |  b33); \
+    t2 = b23 ^ (~b33 |  b43); \
+    t3 =~b33 ^ ( b43 &  b03); \
+    t4 = b43 ^ ( b03 |  b13); \
+    b03 = t0; b13 = t1; b23 = t2; b33 = t3; b43 = t4; \
+    \
+    t0 = b04 ^ (~b14 &  b24); \
+    t1 =~b14 ^ ( b24 |  b34); \
+    t2 = b24 ^ ( b34 &  b44); \
+    t3 = b34 ^ ( b44 |  b04); \
+    t4 = b44 ^ ( b04 &  b14); \
+    b04 = t0; b14 = t1; b24 = t2; b34 = t3; b44 = t4; \
 }
 
+#define IOTA(r) { a00 ^= r; }
 
-void keccak_core_end_64_8(keccak_context *kc, const void *data)
+
+void keccak(constant ulong *_wide, constant uint *_buf, uint nonce, ulong *dst)
 {
-    unsigned char *buf;
-    buf = kc->buf;
+    // Keccak init (doesn't do anything anymore)
+    
+    
+    // Keccak core
+    // DECL_STATE
+    ulong a00, a01, a02, a03, a04;
+    ulong a10, a11, a12, a13, a14;
+    ulong a20, a21, a22, a23, a24;
+    ulong a30, a31, a32, a33, a34;
+    ulong a40, a41, a42, a43, a44;
+    
+    // READ_STATE
+    a00 = _wide[ 0] ^ ( ((ulong)nonce << 32) | _buf[0] );  
+    a10 = _wide[ 1] ^ 0x01;
+    a20 = _wide[ 2];
+    a30 = _wide[ 3];
+    a40 = _wide[ 4];
+    a01 = _wide[ 5];
+    a11 = _wide[ 6];
+    a21 = _wide[ 7];
+    a31 = _wide[ 8] ^ 0x8000000000000000;
+    a41 = _wide[ 9];
+    a02 = _wide[10];
+    a12 = _wide[11];
+    a22 = _wide[12];
+    a32 = _wide[13];
+    a42 = _wide[14];
+    a03 = _wide[15];
+    a13 = _wide[16];
+    a23 = _wide[17];
+    a33 = _wide[18];
+    a43 = _wide[19];
+    a04 = _wide[20];
+    a14 = _wide[21];
+    a24 = _wide[22];
+    a34 = _wide[23];
+    a44 = _wide[24];
+    
+    // INPUT_BUF72 (doesn't do anything anymore)
 
-    buf[8] = 1;
-    #pragma unroll
-    for (int i = 9; i < 71; i++) buf[i] = 0;
-    buf[71] = 0x80;
-
-    DECL_STATE;
-    READ_STATE(kc);
-    INPUT_BUF72;
-
-    // TH_ELT
-    DECL64(tt0); DECL64(tt1); DECL64(tt2); DECL64(tt3);
-
-    // THETA
-    DECL64(t0); DECL64(t1); DECL64(t2); DECL64(t3); DECL64(t4);
-
-    // KHI_XO, KHI_XA
-    DECL64(kt);
-
-    // KHI
-    DECL64(c0); DECL64(c1); DECL64(c2); DECL64(c3); DECL64(c4); DECL64(bnn);
+    // Temp variables for THETA and KHI
+    ulong t0, t1, t2, t3, t4;
 
     /*
     #pragma unroll
@@ -536,28 +323,14 @@ void keccak_core_end_64_8(keccak_context *kc, const void *data)
       KHI ( a00, a01, a02, a03, a04, a10, a11, a12, a13, a14, a20, a21, a22, a23, a24, a30, a31, a32, a33, a34, a40, a41, a42, a43, a44 );
     IOTA(0x8000000080008008);
 
-    WRITE_STATE(kc);
+    
+    // WRITE_STATE
+    dst[0] =  a00;
+    dst[1] = ~a10;
+    dst[2] = ~a20;
+    dst[3] =  a30;
+    dst[4] =  a40;
+    dst[5] =  a01;
+    dst[6] =  a11;
+    dst[7] =  a21;
 }
-
-
-// d = 64, lim = 72, ub = 0. n = 0
-void keccak_close(keccak_context *kc, void *dst)
-{
-    union {
-        unsigned char tmp[72 + 1];
-        ulong dummy;   /* for alignment */
-    } u;
-    size_t j;
-
-    keccak_core_end_64_8(kc, u.tmp);
-    /* Finalize the "lane complement" */
-    kc->wide[ 1] = ~kc->wide[ 1];
-    kc->wide[ 2] = ~kc->wide[ 2];
-    kc->wide[ 8] = ~kc->wide[ 8];
-    kc->wide[12] = ~kc->wide[12];
-    kc->wide[17] = ~kc->wide[17];
-    kc->wide[20] = ~kc->wide[20];
-    for (j = 0; j < 64; j += 8)
-        enc64le_aligned(((uchar*)dst) + j, kc->wide[j >> 3]);
-}
-
