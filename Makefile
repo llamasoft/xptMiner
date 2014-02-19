@@ -17,8 +17,7 @@ CFLAGS = -Wall -Wextra -O2 -fomit-frame-pointer
 #-msse2 -msse3 -mssse3 -msse4a -msse2avx -msse4a -msse4.1 -msse4.2 -mavx 
 
 
-#LIBS = -lcrypto -lssl -lpthread
-LIBS =
+LIBS = -lpthread
 
 ifeq ($(OSVERSION),Linux)
 	LIBS += -lrt -lOpenCL
