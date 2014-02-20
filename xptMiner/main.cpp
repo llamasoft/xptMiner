@@ -8,7 +8,7 @@
 #define MAX_TRANSACTIONS	(4096)
 
 // miner version string (for pool statistic)
-char* minerVersionString = "xptMiner 1.5gg";
+char* minerVersionString = "xptMiner 1.6gg";
 
 volatile uint32 totalCollisionCount;
 volatile uint32 totalShareCount;
@@ -689,7 +689,7 @@ int main(int argc, char** argv)
     minerSettings.protoshareMemoryMode = commandlineInput.ptsMemoryMode;
     printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
     printf("\xBA                                                  \xBA\n");
-    printf("\xBA  xptMiner (v1.1) + GPU Metiscoin Miner (v0.4gg)  \xBA\n");
+    printf("\xBA  xptMiner (v1.1) + GPU Metiscoin Miner (v0.5gg)  \xBA\n");
     printf("\xBA  Author: Girino   (GPU Metiscoin Miner)          \xBA\n");
     printf("\xBA          GigaWatt (GPU Optimizations)            \xBA\n");
     printf("\xBA          jh00     (xptMiner)                     \xBA\n");

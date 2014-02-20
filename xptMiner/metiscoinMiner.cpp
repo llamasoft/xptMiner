@@ -66,7 +66,6 @@ MetiscoinOpenCL::MetiscoinOpenCL(int _device_num, uint32 _step_size) {
 
 void MetiscoinOpenCL::metiscoin_process(minerMetiscoinBlock_t* block)
 {
-
 	block->nonce = 0;
 	uint32 target = *(uint32*)(block->targetShare+28);
 	OpenCLDevice* device = OpenCLMain::getInstance().getDevice(device_num);
